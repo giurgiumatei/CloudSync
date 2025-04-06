@@ -1,0 +1,86 @@
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.cache
+*.ide
+*.dbmdl
+*.jfm
+*.log
+*.pdb
+*.vsp
+*.vspx
+*.sap
+*.log
+_ReSharper*/
+*.DotSettings.user
+*.DotSettings
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+Bin/
+Obj/
+
+# .NET Core build folders
+bin/
+obj/
+
+# Visual Studio Code files
+.vscode/
+
+# Rider files
+.idea/
+
+# Local settings and configurations
+appsettings.Development.json
+launchSettings.json
+*.local.json
+*.secret.json
+secrets.json
+
+# Test results
+TestResults/
+CoverageReports/
+*.trx
+
+# NuGet packages
+*.nupkg
+packages/
+*.snupkg
+*.symbols.nupkg
+
+# Miscellaneous files
+*.DS_Store
+*.bak
+*.orig
+
+# User-specific files
+*.userprefs
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env
+
+# Logs
+*.log
+
+# SQL Server files
+*.mdf
+*.ldf
+
+# Entity Framework migration scripts (if you don't want them tracked)
+/Migrations/*.Designer.cs
+
+# Operating system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

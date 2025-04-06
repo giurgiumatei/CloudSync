@@ -1,6 +1,8 @@
 @CloudSync.Api_HostAddress = http://localhost:5028
 
-GET {{CloudSync.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{CloudSync.Api_HostAddress}}/api/DataSync
+Content-Type: application/json
+
+"Sample data to synchronize"
 
 ###
