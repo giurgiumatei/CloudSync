@@ -23,12 +23,10 @@ x64/
 x86/
 build/
 bld/
-Bin/
-Obj/
 
-# .NET Core build folders
-bin/
-obj/
+# Ignore all bin and obj directories in every folder
+**/bin/
+**/obj/
 
 # Visual Studio Code files
 .vscode/

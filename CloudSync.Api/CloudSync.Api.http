@@ -1,8 +1,15 @@
 @CloudSync.Api_HostAddress = http://localhost:5028
 
+### Data Sync Request
 POST {{CloudSync.Api_HostAddress}}/api/DataSync
 Content-Type: application/json
 
 "Sample data to synchronize"
+
+###
+
+### Health Check Request
+GET {{CloudSync.Api_HostAddress}}/api/HealthCheck/test-connections
+Accept: application/json
 
 ###
