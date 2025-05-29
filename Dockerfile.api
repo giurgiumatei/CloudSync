@@ -1,0 +1,23 @@
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+WORKDIR /app
+EXPOSE 80
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY ["CloudSync.Api/CloudSync.Api.csproj", "CloudSync.Api/"]
+COPY ["CloudSync.Core/CloudSync.Core.csproj", "CloudSync.Core/"]
+COPY ["CloudSync.Data/CloudSync.Data.csproj", "CloudSync.Data/"]
+COPY ["CloudSync.Common/CloudSync.Common.csproj", "CloudSync.Common/"]
+COPY ["CloudSync.Infrastructure/CloudSync.Infrastructure.csproj", "CloudSync.Infrastructure/"]
+RUN dotnet restore "CloudSync.Api/CloudSync.Api.csproj"
+COPY . .
+WORKDIR "/src/CloudSync.Api"
+RUN dotnet build "CloudSync.Api.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "CloudSync.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "CloudSync.Api.dll"]

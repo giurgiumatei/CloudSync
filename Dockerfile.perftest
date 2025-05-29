@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+COPY ["CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj", "CloudSync.PerformanceTests/"]
+RUN dotnet restore "CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj"
+COPY . .
+WORKDIR "/src/CloudSync.PerformanceTests"
+RUN dotnet build "CloudSync.PerformanceTests.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "CloudSync.PerformanceTests.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/runtime:9.0 AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+# Set the API_BASE_URL environment variable to point to the API container by default
+ENV API_BASE_URL=http://api:80
+ENTRYPOINT ["dotnet", "CloudSync.PerformanceTests.dll"]
