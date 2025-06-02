@@ -1,17 +1,67 @@
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src
-COPY ["CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj", "CloudSync.PerformanceTests/"]
-RUN dotnet restore "CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj"
-COPY . .
-WORKDIR "/src/CloudSync.PerformanceTests"
-RUN dotnet build "CloudSync.PerformanceTests.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "CloudSync.PerformanceTests.csproj" -c Release -o /app/publish /p:UseAppHost=false
-
-FROM mcr.microsoft.com/dotnet/runtime:9.0 AS final
+# Use the official .NET 9 runtime as base image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
+
+# Install performance monitoring and debugging tools
+RUN apk add --no-cache \
+    curl \
+    procps \
+    htop \
+    iotop \
+    nethogs \
+    tcpdump \
+    && rm -rf /var/cache/apk/*
+
+# Use the SDK image to build the application
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+WORKDIR /src
+
+# Copy project files for dependency restoration
+COPY CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj CloudSync.PerformanceTests/
+
+# Restore dependencies
+RUN dotnet restore CloudSync.PerformanceTests/CloudSync.PerformanceTests.csproj
+
+# Copy the source code
+COPY CloudSync.PerformanceTests/ CloudSync.PerformanceTests/
+
+# Build the application
+WORKDIR /src/CloudSync.PerformanceTests
+RUN dotnet build CloudSync.PerformanceTests.csproj -c Release -o /app/build
+
+# Publish the application
+FROM build AS publish
+RUN dotnet publish CloudSync.PerformanceTests.csproj -c Release -o /app/publish \
+    --no-restore \
+    --self-contained false
+
+# Final stage/image
+FROM base AS final
+WORKDIR /app
+
+# Copy the published application
 COPY --from=publish /app/publish .
-# Set the API_BASE_URL environment variable to point to the API container by default
-ENV API_BASE_URL=http://api:80
+
+# Create results directory and set permissions
+RUN mkdir -p /app/results && \
+    addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -G appgroup -u 1001 && \
+    chown -R appuser:appgroup /app
+
+# Configure environment variables for high-performance testing
+ENV DOTNET_GCServer=1 \
+    DOTNET_GCConcurrent=1 \
+    DOTNET_GCRetainVM=1 \
+    DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6 \
+    DOTNET_ThreadPool_ForceMinWorkerThreads=100 \
+    DOTNET_ThreadPool_ForceMaxWorkerThreads=1000 \
+    DOTNET_System_Net_Http_SocketsHttpHandler_MaxConnectionsPerServer=1000
+
+# Switch to non-root user
+USER appuser
+
+# Add a simple health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=2 \
+    CMD test -f /app/results/latest_results_summary.txt || exit 1
+
 ENTRYPOINT ["dotnet", "CloudSync.PerformanceTests.dll"]

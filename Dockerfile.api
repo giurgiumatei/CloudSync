@@ -1,23 +1,65 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+# Use the official .NET 9 runtime as base image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
 WORKDIR /app
 EXPOSE 80
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# Install required packages for performance and debugging
+RUN apk add --no-cache \
+    curl \
+    procps \
+    htop \
+    && rm -rf /var/cache/apk/*
+
+# Use the SDK image to build the application
+FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
-COPY ["CloudSync.Api/CloudSync.Api.csproj", "CloudSync.Api/"]
-COPY ["CloudSync.Core/CloudSync.Core.csproj", "CloudSync.Core/"]
-COPY ["CloudSync.Data/CloudSync.Data.csproj", "CloudSync.Data/"]
-COPY ["CloudSync.Common/CloudSync.Common.csproj", "CloudSync.Common/"]
-COPY ["CloudSync.Infrastructure/CloudSync.Infrastructure.csproj", "CloudSync.Infrastructure/"]
-RUN dotnet restore "CloudSync.Api/CloudSync.Api.csproj"
+
+# Copy project files
+COPY CloudSync.Api/CloudSync.Api.csproj CloudSync.Api/
+COPY CloudSync.Core/CloudSync.Core.csproj CloudSync.Core/
+COPY CloudSync.Data/CloudSync.Data.csproj CloudSync.Data/
+COPY CloudSync.Infrastructure/CloudSync.Infrastructure.csproj CloudSync.Infrastructure/
+COPY CloudSync.Common/CloudSync.Common.csproj CloudSync.Common/
+
+# Restore dependencies
+RUN dotnet restore CloudSync.Api/CloudSync.Api.csproj
+
+# Copy the source code
 COPY . .
-WORKDIR "/src/CloudSync.Api"
-RUN dotnet build "CloudSync.Api.csproj" -c Release -o /app/build
 
+# Build the application
+WORKDIR /src/CloudSync.Api
+RUN dotnet build CloudSync.Api.csproj -c Release -o /app/build
+
+# Publish the application
 FROM build AS publish
-RUN dotnet publish "CloudSync.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish CloudSync.Api.csproj -c Release -o /app/publish \
+    --no-restore \
+    --self-contained false
 
+# Final stage/image
 FROM base AS final
 WORKDIR /app
+
+# Copy the published application
 COPY --from=publish /app/publish .
+
+# Create a non-root user for security
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -G appgroup -u 1001
+RUN chown -R appuser:appgroup /app
+USER appuser
+
+# Configure environment variables for performance
+ENV DOTNET_GCServer=1 \
+    DOTNET_GCConcurrent=1 \
+    DOTNET_GCRetainVM=1 \
+    DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6 \
+    ASPNETCORE_URLS=http://+:80 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:80/api/healthcheck/test-connections || exit 1
+
 ENTRYPOINT ["dotnet", "CloudSync.Api.dll"]

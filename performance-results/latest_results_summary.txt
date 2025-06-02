@@ -1,0 +1,21 @@
+Test Results Summary - 06/02/2025 23:13:55
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 60
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 3.45ms
+Min Response Time: 1ms
+Max Response Time: 17ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 4ms
+P95 Response Time: 5ms
+P99 Response Time: 15ms
+Throughput: 1.00 RPS
+Test Duration: 00:01:00
+Status Codes: 500: 60
+

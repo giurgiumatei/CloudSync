@@ -11,9 +11,29 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__AzureConnection=Server=azure-db;Database=AzureDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
       - ConnectionStrings__AwsConnection=Server=aws-db;Database=AwsDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
+      - ASPNETCORE_URLS=http://+:80
+      # Performance optimizations
+      - DOTNET_GCServer=1
+      - DOTNET_GCConcurrent=1
+      - DOTNET_GCRetainVM=1
     depends_on:
       - azure-db
       - aws-db
+    restart: unless-stopped
+    # Resource limits for consistent performance testing
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 4G
+        reservations:
+          cpus: '2.0'
+          memory: 2G
+    # Network optimizations
+    sysctls:
+      net.core.somaxconn: 65535
+      net.ipv4.tcp_tw_reuse: 1
+      net.ipv4.tcp_fin_timeout: 30
 
   perftest:
     build:
@@ -21,26 +41,100 @@ services:
       dockerfile: Dockerfile.perftest
     environment:
       - API_BASE_URL=http://api:80
+      - DOTNET_GCServer=1
+      - DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6
     depends_on:
       - api
     volumes:
       - ./performance-results:/app/results
+    restart: "no" # Don't restart performance tests automatically
+    # High resource limits for load generation
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 8G
+        reservations:
+          cpus: '4.0'
+          memory: 4G
+    # Network optimizations for high throughput
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    sysctls:
+      net.core.somaxconn: 65535
+      net.ipv4.ip_local_port_range: "1024 65535"
+      net.ipv4.tcp_tw_reuse: 1
 
   azure-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=P@ssw0rd
+      - MSSQL_PID=Developer
     ports:
       - "1433:1433"
+    restart: unless-stopped
+    # Database performance optimizations
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    volumes:
+      - azure-db-data:/var/opt/mssql
 
   aws-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=P@ssw0rd
+      - MSSQL_PID=Developer
     ports:
       - "1434:1433"
+    restart: unless-stopped
+    # Database performance optimizations
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    volumes:
+      - aws-db-data:/var/opt/mssql
+
+  # Optional monitoring service for performance insights
+  monitoring:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    profiles:
+      - monitoring
 
 volumes:
-  performance-results:
+  azure-db-data:
+  aws-db-data:
+  prometheus-data:
+
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500
