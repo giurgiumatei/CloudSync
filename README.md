@@ -2,6 +2,31 @@
 
 A comprehensive performance testing suite for the CloudSync API that synchronizes data between Azure and AWS cloud databases. This framework supports testing from 1 to 1,000,000 requests per second with detailed reporting and analysis.
 
+## Project Overview
+
+This repository contains a small .NET API along with an extensive performance
+testing framework. The solution is organized under `CloudSyncSolution` and the
+most important folders include:
+
+```
+CloudSyncSolution/
+├── CloudSync.Api/             # Main API project
+├── CloudSync.PerformanceTests/# Enhanced performance testing
+├── CloudSync.Core/            # Business logic
+├── CloudSync.Data/            # Data access layer
+├── docker-compose.yml         # Container orchestration
+├── run-performance-tests.sh   # Automated test runner
+├── monitoring/                # Prometheus configuration
+└── performance-results/       # Auto-generated test results
+```
+
+The API exposes controllers for data synchronization and health checks, wired up
+in `Program.cs`. Business logic lives in `CloudSync.Core` while database access
+is implemented in `CloudSync.Data`. Performance tests are driven by a custom
+load generator located in `CloudSync.PerformanceTests` and can reach from 1 to
+1,000,000 requests per second. Docker and helper scripts make it easy to run the
+entire stack locally.
+
 ## 🚀 Features
 
 - **Wide Range Testing**: 1 to 1,000,000 requests per second
@@ -104,6 +129,21 @@ CloudSyncSolution/
     ├── performance_analysis.md        # Detailed analysis
     └── latest_results_summary.txt     # Quick summary
 ```
+
+## Next Steps for Newcomers
+
+1. **Understand the API flow** – Review `SyncService`, the controllers, and how the
+   EF Core contexts are configured.
+2. **Run the system locally** – Use `docker-compose` or the provided scripts to
+   start the API, databases, and performance tests (see "Quick Start").
+3. **Explore performance results** – After running tests, inspect the CSV and
+   HTML files in `performance-results` to see metrics and summaries.
+4. **Investigate customization** – Adjust test parameters in
+   `CustomPerformanceTest.cs` and experiment with the `GenerateRequestRates`
+   method.
+5. **Dive deeper** – Look at the Prometheus configuration in
+   `monitoring/prometheus.yml` and consider extending the infrastructure or
+   common projects for logging or queuing.
 
 ## ⚙️ Configuration
 
