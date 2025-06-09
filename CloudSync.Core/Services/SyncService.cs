@@ -17,15 +17,17 @@ public class SyncService : ISyncService
 
     public async Task<bool> SyncDataAsync(string data)
     {
-        var entity = new DataEntity { Data = data };
+        // Create separate entity instances for each database to avoid identity conflicts
+        var azureEntity = new DataEntity { Data = data };
+        var awsEntity = new DataEntity { Data = data };
 
         await using var azureTransaction = await _azureContext.Database.BeginTransactionAsync();
         await using var awsTransaction = await _awsContext.Database.BeginTransactionAsync();
 
         try
         {
-            await _azureContext.DataEntities.AddAsync(entity);
-            await _awsContext.DataEntities.AddAsync(entity);
+            await _azureContext.DataEntities.AddAsync(azureEntity);
+            await _awsContext.DataEntities.AddAsync(awsEntity);
 
             await _azureContext.SaveChangesAsync();
             await _awsContext.SaveChangesAsync();

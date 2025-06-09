@@ -19,3 +19,297 @@ Throughput: 1.00 RPS
 Test Duration: 00:01:00
 Status Codes: 500: 60
 
+Test Results Summary - 06/09/2025 10:23:07
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 60
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 3.53ms
+Min Response Time: 1ms
+Max Response Time: 31ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 5ms
+P95 Response Time: 6ms
+P99 Response Time: 16ms
+Throughput: 1.00 RPS
+Test Duration: 00:01:00
+Status Codes: 500: 60
+
+Test Results Summary - 06/09/2025 10:25:15
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 60
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 3.40ms
+Min Response Time: 1ms
+Max Response Time: 29ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 5ms
+P95 Response Time: 5ms
+P99 Response Time: 15ms
+Throughput: 1.00 RPS
+Test Duration: 00:01:00
+Status Codes: 500: 60
+
+Test Results Summary - 06/09/2025 10:26:56
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 3.83ms
+Min Response Time: 2ms
+Max Response Time: 26ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 5ms
+P95 Response Time: 5ms
+P99 Response Time: 20ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 30
+
+Test Results Summary - 06/09/2025 10:28:16
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 5.47ms
+Min Response Time: 2ms
+Max Response Time: 66ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 5ms
+P95 Response Time: 5ms
+P99 Response Time: 48ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 30
+
+Test Results Summary - 06/09/2025 10:28:51
+=============================
+Round: 2
+API URL: http://api:80
+Target Request Rate: 2 requests per second
+Actual RPS: 2.00
+Total Requests: 60
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 3.22ms
+Min Response Time: 1ms
+Max Response Time: 11ms
+Median Response Time: 3ms
+P50 Response Time: 3ms
+P90 Response Time: 5ms
+P95 Response Time: 6ms
+P99 Response Time: 8ms
+Throughput: 2.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 60
+
+Test Results Summary - 06/09/2025 10:29:26
+=============================
+Round: 3
+API URL: http://api:80
+Target Request Rate: 5 requests per second
+Actual RPS: 4.98
+Total Requests: 150
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 2.40ms
+Min Response Time: 1ms
+Max Response Time: 9ms
+Median Response Time: 2ms
+P50 Response Time: 2ms
+P90 Response Time: 4ms
+P95 Response Time: 4ms
+P99 Response Time: 5ms
+Throughput: 4.98 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 150
+
+Test Results Summary - 06/09/2025 10:30:01
+=============================
+Round: 4
+API URL: http://api:80
+Target Request Rate: 10 requests per second
+Actual RPS: 9.88
+Total Requests: 297
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 2.92ms
+Min Response Time: 1ms
+Max Response Time: 12ms
+Median Response Time: 2ms
+P50 Response Time: 2ms
+P90 Response Time: 5ms
+P95 Response Time: 6ms
+P99 Response Time: 9ms
+Throughput: 9.88 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 297
+
+Test Results Summary - 06/09/2025 16:58:34
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 5.10ms
+Min Response Time: 2ms
+Max Response Time: 37ms
+Median Response Time: 4ms
+P50 Response Time: 4ms
+P90 Response Time: 7ms
+P95 Response Time: 7ms
+P99 Response Time: 28ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 30
+
+Test Results Summary - 06/09/2025 17:00:49
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 16.60ms
+Min Response Time: 9ms
+Max Response Time: 79ms
+Median Response Time: 13ms
+P50 Response Time: 13ms
+P90 Response Time: 18ms
+P95 Response Time: 30ms
+P99 Response Time: 66ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 30
+
+Test Results Summary - 06/09/2025 17:08:26
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 0.00 %
+Error Rate: 100.00 %
+Avg Response Time: 14.10ms
+Min Response Time: 9ms
+Max Response Time: 36ms
+Median Response Time: 13ms
+P50 Response Time: 13ms
+P90 Response Time: 16ms
+P95 Response Time: 17ms
+P99 Response Time: 30ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 500: 30
+
+Test Results Summary - 06/09/2025 17:12:24
+=============================
+Round: 1
+API URL: http://api:80
+Target Request Rate: 1 requests per second
+Actual RPS: 1.00
+Total Requests: 30
+Success Rate: 100.00 %
+Error Rate: 0.00 %
+Avg Response Time: 20.30ms
+Min Response Time: 15ms
+Max Response Time: 52ms
+Median Response Time: 19ms
+P50 Response Time: 19ms
+P90 Response Time: 22ms
+P95 Response Time: 23ms
+P99 Response Time: 43ms
+Throughput: 1.00 RPS
+Test Duration: 00:00:30
+Status Codes: 200: 30
+
+Test Results Summary - 06/09/2025 17:12:59
+=============================
+Round: 2
+API URL: http://api:80
+Target Request Rate: 2 requests per second
+Actual RPS: 2.00
+Total Requests: 60
+Success Rate: 100.00 %
+Error Rate: 0.00 %
+Avg Response Time: 24.42ms
+Min Response Time: 14ms
+Max Response Time: 166ms
+Median Response Time: 20ms
+P50 Response Time: 20ms
+P90 Response Time: 26ms
+P95 Response Time: 31ms
+P99 Response Time: 138ms
+Throughput: 2.00 RPS
+Test Duration: 00:00:30
+Status Codes: 200: 60
+
+Test Results Summary - 06/09/2025 17:13:34
+=============================
+Round: 3
+API URL: http://api:80
+Target Request Rate: 5 requests per second
+Actual RPS: 4.97
+Total Requests: 150
+Success Rate: 100.00 %
+Error Rate: 0.00 %
+Avg Response Time: 38.21ms
+Min Response Time: 15ms
+Max Response Time: 172ms
+Median Response Time: 30ms
+P50 Response Time: 30ms
+P90 Response Time: 62ms
+P95 Response Time: 112ms
+P99 Response Time: 160ms
+Throughput: 4.97 RPS
+Test Duration: 00:00:30
+Status Codes: 200: 150
+
+Test Results Summary - 06/09/2025 17:14:09
+=============================
+Round: 4
+API URL: http://api:80
+Target Request Rate: 10 requests per second
+Actual RPS: 9.91
+Total Requests: 298
+Success Rate: 100.00 %
+Error Rate: 0.00 %
+Avg Response Time: 31.68ms
+Min Response Time: 16ms
+Max Response Time: 283ms
+Median Response Time: 28ms
+P50 Response Time: 28ms
+P90 Response Time: 35ms
+P95 Response Time: 45ms
+P99 Response Time: 190ms
+Throughput: 9.91 RPS
+Test Duration: 00:00:30
+Status Codes: 200: 298
+

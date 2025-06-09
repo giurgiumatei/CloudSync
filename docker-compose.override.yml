@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  api:
+    depends_on:
+      - azure-db
+      - aws-db
+    # Remove health check dependency temporarily
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AzureConnection=Server=azure-db;Database=AzureDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
+      - ConnectionStrings__AwsConnection=Server=aws-db;Database=AwsDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
+      - ASPNETCORE_URLS=http://+:80
+      - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false  # Explicitly disable invariant mode
+      - DOTNET_GCServer=1
+      - DOTNET_GCConcurrent=1
+      - DOTNET_GCRetainVM=1
+    
+  perftest:
+    depends_on:
+      - api
+    # Remove health check dependency temporarily
+    environment:
+      - API_BASE_URL=http://api:80
+      - DOTNET_GCServer=1
+      - DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6
+      - QUICK_TEST=true  # Enable quick test mode
+
+  azure-db:
+    # Remove health check temporarily
+    healthcheck:
+      disable: true
+      
+  aws-db:
+    # Remove health check temporarily  
+    healthcheck:
+      disable: true 

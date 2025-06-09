@@ -17,8 +17,10 @@ services:
       - DOTNET_GCConcurrent=1
       - DOTNET_GCRetainVM=1
     depends_on:
-      - azure-db
-      - aws-db
+      azure-db:
+        condition: service_healthy
+      aws-db:
+        condition: service_healthy
     restart: unless-stopped
     # Resource limits for consistent performance testing
     deploy:
@@ -34,6 +36,12 @@ services:
       net.core.somaxconn: 65535
       net.ipv4.tcp_tw_reuse: 1
       net.ipv4.tcp_fin_timeout: 30
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   perftest:
     build:
@@ -44,7 +52,8 @@ services:
       - DOTNET_GCServer=1
       - DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     volumes:
       - ./performance-results:/app/results
     restart: "no" # Don't restart performance tests automatically
@@ -87,6 +96,13 @@ services:
           memory: 1G
     volumes:
       - azure-db-data:/var/opt/mssql
+      - ./Scripts/init-azure-db.sql:/docker-entrypoint-initdb.d/init-azure-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   aws-db:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -108,6 +124,38 @@ services:
           memory: 1G
     volumes:
       - aws-db-data:/var/opt/mssql
+      - ./Scripts/init-aws-db.sql:/docker-entrypoint-initdb.d/init-aws-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Database initializer service
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      azure-db:
+        condition: service_healthy
+      aws-db:
+        condition: service_healthy
+    volumes:
+      - ./Scripts:/scripts:ro
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=P@ssw0rd
+    command: >
+      bash -c "
+        echo 'Waiting for databases to be ready...' &&
+        sleep 10 &&
+        echo 'Initializing Azure database...' &&
+        /opt/mssql-tools/bin/sqlcmd -S azure-db -U sa -P P@ssw0rd -i /scripts/init-azure-db.sql &&
+        echo 'Initializing AWS database...' &&
+        /opt/mssql-tools/bin/sqlcmd -S aws-db -U sa -P P@ssw0rd -i /scripts/init-aws-db.sql &&
+        echo 'Database initialization completed successfully!'
+      "
+    restart: "no"
 
   # Optional monitoring service for performance insights
   monitoring:

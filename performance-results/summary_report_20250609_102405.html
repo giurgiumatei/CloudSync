@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CloudSync Performance Test Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background-color: #f0f8ff; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .round { background-color: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007acc; }
+        .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
+        .metric { background-color: white; padding: 10px; border: 1px solid #ddd; border-radius: 3px; }
+        .success { color: #28a745; }
+        .warning { color: #ffc107; }
+        .error { color: #dc3545; }
+        .chart-container { margin: 20px 0; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>CloudSync Performance Test Report</h1>
+        <p>Test started: 2025-06-09 10:24:05</p>
+        <p>API Endpoint: http://api:80/api/datasync</p>
+        <p>Test Range: 1 to 1,000,000 requests per second</p>
+    </div>
+    <div id="results">
+
+    <div class="round">
+        <h3>Round 1: 1 RPS</h3>
+        <div class="metrics">
+            <div class="metric">
+                <strong>Success Rate:</strong> 
+                <span class="error">0.00 %</span>
+            </div>
+            <div class="metric">
+                <strong>Actual RPS:</strong> 1
+            </div>
+            <div class="metric">
+                <strong>Avg Response Time:</strong> 3.40ms
+            </div>
+            <div class="metric">
+                <strong>P99 Response Time:</strong> 15ms
+            </div>
+            <div class="metric">
+                <strong>Total Requests:</strong> 60
+            </div>
+            <div class="metric">
+                <strong>Errors:</strong> 60
+            </div>
+        </div>
+        <p><strong>Status Codes:</strong> 500: 60</p>
+    </div>

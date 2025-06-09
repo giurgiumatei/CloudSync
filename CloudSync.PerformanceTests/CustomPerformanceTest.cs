@@ -18,8 +18,10 @@ public class CustomPerformanceTest
     
     // Enhanced test configuration for 1 to 1,000,000 RPS
     private readonly int[] _requestRates = GenerateRequestRates();
-    private readonly TimeSpan _testDuration = TimeSpan.FromSeconds(60); // Extended duration for more accurate results
-    private readonly TimeSpan _warmupDuration = TimeSpan.FromSeconds(10); // Warmup period
+    private readonly TimeSpan _testDuration = Environment.GetEnvironmentVariable("QUICK_TEST") == "true" 
+        ? TimeSpan.FromSeconds(30) : TimeSpan.FromSeconds(60); // Quick test or full duration
+    private readonly TimeSpan _warmupDuration = Environment.GetEnvironmentVariable("QUICK_TEST") == "true" 
+        ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10); // Quick warmup or full warmup
     private readonly string _resultsDirectory;
     private readonly string _logFilePath;
     private readonly string _roundReportPath;
@@ -51,6 +53,13 @@ public class CustomPerformanceTest
 
     private static int[] GenerateRequestRates()
     {
+        // Check if we're in quick test mode
+        var quickTest = Environment.GetEnvironmentVariable("QUICK_TEST") == "true";
+        if (quickTest)
+        {
+            return new[] { 1, 2, 5, 10 }; // Quick test - just 4 rates
+        }
+        
         var rates = new List<int>();
         
         // Low range: 1-10 RPS
