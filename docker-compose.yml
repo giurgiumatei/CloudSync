@@ -277,6 +277,40 @@ services:
       retries: 3
       start_period: 40s
 
+  # Azure Kafka Consumer Service
+  azure-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.azure-consumer
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__Consumer__GroupId=azure-sync-group
+      - Kafka__Consumer__ClientId=cloudsync-azure-consumer
+      - AzureEndpoint__BaseUrl=https://api.azure-example.com
+      - DOTNET_GCServer=1
+      - DOTNET_GCConcurrent=1
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'CloudSync.KafkaAzureConsumer' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Optional monitoring service for performance insights
   monitoring:
     image: prom/prometheus:latest
