@@ -24,7 +24,6 @@ services:
       - API_BASE_URL=http://api:80
       - DOTNET_GCServer=1
       - DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6
-      - QUICK_TEST=true  # Enable quick test mode
 
   azure-db:
     # Remove health check temporarily

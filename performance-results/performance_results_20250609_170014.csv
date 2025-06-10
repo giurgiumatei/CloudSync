@@ -1,2 +1,0 @@
-Round,RequestRate,Timestamp,ActualRPS,TotalRequests,SuccessCount,ErrorCount,SuccessRate,ErrorRate,AvgResponseTime,MinResponseTime,MaxResponseTime,MedianResponseTime,P50ResponseTime,P90ResponseTime,P95ResponseTime,P99ResponseTime,ThroughputRPS,TestDurationSeconds,StatusCode200,StatusCode400,StatusCode500,OtherStatusCodes
-1,1,2025-06-09 17:00:49,1.00,30,0,30,0.0000,1.0000,16.60,9,79,13,13,18,30,66,1.00,30.08,0,0,30,0
