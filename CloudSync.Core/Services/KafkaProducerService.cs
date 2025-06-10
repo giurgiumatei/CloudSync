@@ -111,6 +111,15 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
 
     public async Task<bool> PublishToDeadLetterQueueAsync(DataSyncMessage message, string error)
     {
+        return await PublishToDeadLetterQueueAsync(message, error, null, null);
+    }
+
+    public async Task<bool> PublishToDeadLetterQueueAsync(
+        DataSyncMessage message, 
+        string error, 
+        ProcessingError? processingError = null,
+        Dictionary<string, string>? additionalContext = null)
+    {
         try
         {
             var dlqMessage = new DataSyncMessage
@@ -133,19 +142,44 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
                     { "MessageType", System.Text.Encoding.UTF8.GetBytes("DeadLetter") },
                     { "OriginalTopic", System.Text.Encoding.UTF8.GetBytes(_kafkaConfig.Topics.DataTopic) },
                     { "Error", System.Text.Encoding.UTF8.GetBytes(error) },
-                    { "FailedAt", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O")) }
+                    { "FailedAt", System.Text.Encoding.UTF8.GetBytes(DateTime.UtcNow.ToString("O")) },
+                    { "RetryCount", System.Text.Encoding.UTF8.GetBytes(message.RetryCount.ToString()) }
                 }
             };
 
+            // Add processing error details if available
+            if (processingError != null)
+            {
+                kafkaMessage.Headers.Add("ErrorType", System.Text.Encoding.UTF8.GetBytes(processingError.Type.ToString()));
+                kafkaMessage.Headers.Add("ErrorSeverity", System.Text.Encoding.UTF8.GetBytes(processingError.Severity.ToString()));
+                kafkaMessage.Headers.Add("ErrorId", System.Text.Encoding.UTF8.GetBytes(processingError.Id));
+                
+                if (!string.IsNullOrEmpty(processingError.Source))
+                    kafkaMessage.Headers.Add("ErrorSource", System.Text.Encoding.UTF8.GetBytes(processingError.Source));
+            }
+
+            // Add additional context if provided
+            if (additionalContext != null)
+            {
+                foreach (var kvp in additionalContext)
+                {
+                    kafkaMessage.Headers.Add($"Context_{kvp.Key}", System.Text.Encoding.UTF8.GetBytes(kvp.Value));
+                }
+            }
+
             var deliveryResult = await _producer.ProduceAsync(_kafkaConfig.Topics.DeadLetterQueue, kafkaMessage);
             
-            _logger.LogWarning("Message {MessageId} sent to DLQ due to error: {Error}", message.Id, error);
+            var errorType = processingError?.Type?.ToString() ?? "Unknown";
+            var severity = processingError?.Severity?.ToString() ?? "Unknown";
+            
+            _logger.LogWarning("Message {MessageId} sent to DLQ - Error: {Error}, Type: {ErrorType}, Severity: {Severity}, Retries: {RetryCount}", 
+                message.Id, error, errorType, severity, message.RetryCount);
             
             return deliveryResult.Status == PersistenceStatus.Persisted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send message {MessageId} to DLQ", message.Id);
+            _logger.LogCritical(ex, "Critical failure: Could not send message {MessageId} to DLQ. Message may be lost!", message.Id);
             return false;
         }
     }

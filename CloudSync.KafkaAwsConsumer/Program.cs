@@ -22,9 +22,10 @@ builder.Services.AddLogging(configure =>
     configure.AddConfiguration(builder.Configuration.GetSection("Logging"));
 });
 
-// Configure Kafka settings
+// Configure settings
 builder.Services.Configure<KafkaConfiguration>(builder.Configuration.GetSection("Kafka"));
 builder.Services.Configure<AwsEndpointConfiguration>(builder.Configuration.GetSection("AwsEndpoint"));
+builder.Services.Configure<ErrorHandlingConfiguration>(builder.Configuration.GetSection("ErrorHandling"));
 
 // Register HTTP client
 builder.Services.AddHttpClient<AwsKafkaConsumerService>();
@@ -40,7 +41,7 @@ builder.Services.AddHostedService<AwsConsumerHostedService>();
 var host = builder.Build();
 
 var logger = host.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("Starting AWS Kafka Consumer Application");
+logger.LogInformation("Starting AWS Kafka Consumer Application with enhanced error handling");
 
 try
 {
