@@ -7,17 +7,42 @@ namespace CloudSync.Api.Controllers;
 [Route("api/[controller]")]
 public class DataSyncController : ControllerBase
 {
-    private readonly ISyncService _syncService;
+    private readonly IKafkaProducerService _kafkaProducerService;
+    private readonly ILogger<DataSyncController> _logger;
 
-    public DataSyncController(ISyncService syncService)
+    public DataSyncController(IKafkaProducerService kafkaProducerService, ILogger<DataSyncController> logger)
     {
-        _syncService = syncService;
+        _kafkaProducerService = kafkaProducerService;
+        _logger = logger;
     }
 
     [HttpPost]
     public async Task<IActionResult> SyncData([FromBody] string data)
     {
-        var result = await _syncService.SyncDataAsync(data);
-        return result ? Ok("Data synchronized.") : StatusCode(500, "Sync failed.");
+        try
+        {
+            if (string.IsNullOrWhiteSpace(data))
+            {
+                return BadRequest("Data cannot be null or empty.");
+            }
+
+            var result = await _kafkaProducerService.PublishDataSyncMessageAsync(data);
+            
+            if (result)
+            {
+                _logger.LogDebug("Data message published to Kafka successfully");
+                return Ok("Data message queued for synchronization.");
+            }
+            else
+            {
+                _logger.LogWarning("Failed to publish data message to Kafka");
+                return StatusCode(500, "Failed to queue data for synchronization.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while publishing data to Kafka");
+            return StatusCode(500, "Internal server error occurred.");
+        }
     }
 }

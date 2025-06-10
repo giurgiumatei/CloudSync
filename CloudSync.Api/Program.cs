@@ -1,3 +1,4 @@
+using CloudSync.Core.Configuration;
 using CloudSync.Core.Services;
 using CloudSync.Core.Services.Interfaces;
 using CloudSync.Data.Contexts;
@@ -13,7 +14,12 @@ builder.Services.AddDbContext<AzureDbContext>(options =>
 builder.Services.AddDbContext<AwsDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("AwsConnection")));
 
+// Configure Kafka
+builder.Services.Configure<KafkaConfiguration>(builder.Configuration.GetSection("Kafka"));
+
+// Register services
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
 
 // Add health checks
 builder.Services.AddHealthChecks()
