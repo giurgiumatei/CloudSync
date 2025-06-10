@@ -1,6 +1,7 @@
 using CloudSync.Core.Configuration;
 using CloudSync.Core.Services;
 using CloudSync.Core.Services.Interfaces;
+using CloudSync.KafkaAzureConsumer.Configuration;
 using CloudSync.KafkaAzureConsumer.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,23 +17,25 @@ builder.Configuration
     .AddCommandLine(args);
 
 // Configure logging
-builder.Services.AddLogging(configure => 
-{
-    configure.AddConsole();
-    configure.AddConfiguration(builder.Configuration.GetSection("Logging"));
-});
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // Configure settings
 builder.Services.Configure<KafkaConfiguration>(builder.Configuration.GetSection("Kafka"));
 builder.Services.Configure<AzureEndpointConfiguration>(builder.Configuration.GetSection("AzureEndpoint"));
 builder.Services.Configure<ErrorHandlingConfiguration>(builder.Configuration.GetSection("ErrorHandling"));
+builder.Services.Configure<RetryConfiguration>(builder.Configuration.GetSection("ErrorHandling:RetryConfiguration"));
+builder.Services.Configure<IdempotencyConfiguration>(builder.Configuration.GetSection("Idempotency"));
 
 // Register HTTP client
 builder.Services.AddHttpClient<AzureKafkaConsumerService>();
 
 // Register services
-builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
-builder.Services.AddScoped<IKafkaConsumerService, AzureKafkaConsumerService>();
+builder.Services.AddSingleton<IRetryService, RetryService>();
+builder.Services.AddSingleton<IErrorClassifier, ErrorClassifier>();
+builder.Services.AddSingleton<IIdempotencyService, InMemoryIdempotencyService>();
+builder.Services.AddSingleton<IAzureKafkaConsumerService, AzureKafkaConsumerService>();
 
 // Register the hosted service
 builder.Services.AddHostedService<AzureConsumerHostedService>();
@@ -43,13 +46,25 @@ var host = builder.Build();
 var logger = host.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("Starting Azure Kafka Consumer Application with enhanced error handling");
 
+// Configure graceful shutdown
+var cancellationTokenSource = new CancellationTokenSource();
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    cancellationTokenSource.Cancel();
+};
+
 try
 {
-    await host.RunAsync();
+    await host.RunAsync(cancellationTokenSource.Token);
+}
+catch (OperationCanceledException)
+{
+    logger.LogInformation("Azure Consumer service stopped gracefully.");
 }
 catch (Exception ex)
 {
-    logger.LogCritical(ex, "Azure Kafka Consumer Application terminated unexpectedly");
+    logger.LogCritical(ex, "Azure Consumer service failed");
     throw;
 }
 finally

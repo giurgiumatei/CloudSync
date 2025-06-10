@@ -1,321 +1,333 @@
 using CloudSync.Core.Configuration;
 using CloudSync.Core.DTOs;
-using CloudSync.Core.Services;
 using CloudSync.Core.Services.Interfaces;
+using CloudSync.KafkaAzureConsumer.Configuration;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net;
 using System.Text.Json;
 
 namespace CloudSync.KafkaAzureConsumer.Services;
 
-public class AzureKafkaConsumerService : IKafkaConsumerService, IDisposable
+public interface IAzureKafkaConsumerService
 {
-    private readonly IConsumer<string, string> _consumer;
-    private readonly IKafkaProducerService _kafkaProducerService;
+    Task StartConsumingAsync(CancellationToken cancellationToken);
+    Task StopConsumingAsync();
+}
+
+public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
+{
+    private readonly ILogger<AzureKafkaConsumerService> _logger;
     private readonly KafkaConfiguration _kafkaConfig;
     private readonly AzureEndpointConfiguration _azureConfig;
-    private readonly ErrorHandlingConfiguration _errorConfig;
-    private readonly ILogger<AzureKafkaConsumerService> _logger;
+    private readonly IRetryService _retryService;
+    private readonly IErrorClassifier _errorClassifier;
+    private readonly IIdempotencyService _idempotencyService;
     private readonly HttpClient _httpClient;
-    private readonly RetryService _retryService;
+    private IConsumer<string, string>? _consumer;
+    private readonly string _consumerGroupId = "azure-sync-group";
     private bool _isConsuming = false;
-    private bool _disposed = false;
 
     public AzureKafkaConsumerService(
+        ILogger<AzureKafkaConsumerService> logger,
         IOptions<KafkaConfiguration> kafkaConfig,
         IOptions<AzureEndpointConfiguration> azureConfig,
-        IOptions<ErrorHandlingConfiguration> errorConfig,
-        IKafkaProducerService kafkaProducerService,
-        ILogger<AzureKafkaConsumerService> logger,
+        IRetryService retryService,
+        IErrorClassifier errorClassifier,
+        IIdempotencyService idempotencyService,
         HttpClient httpClient)
     {
+        _logger = logger;
         _kafkaConfig = kafkaConfig.Value;
         _azureConfig = azureConfig.Value;
-        _errorConfig = errorConfig.Value;
-        _kafkaProducerService = kafkaProducerService;
-        _logger = logger;
+        _retryService = retryService;
+        _errorClassifier = errorClassifier;
+        _idempotencyService = idempotencyService;
         _httpClient = httpClient;
-        _retryService = new RetryService(_errorConfig.TransientErrors, logger);
+        
+        ConfigureHttpClient();
+    }
 
-        var config = new ConsumerConfig
-        {
-            BootstrapServers = _kafkaConfig.BootstrapServers,
-            GroupId = _kafkaConfig.Consumer.GroupId,
-            ClientId = _kafkaConfig.Consumer.ClientId,
-            AutoOffsetReset = ParseAutoOffsetReset(_kafkaConfig.Consumer.AutoOffsetReset),
-            EnableAutoCommit = _kafkaConfig.Consumer.EnableAutoCommit,
-            MaxPollIntervalMs = _kafkaConfig.Consumer.MaxPollIntervalMs,
-            SessionTimeoutMs = _kafkaConfig.Consumer.SessionTimeoutMs,
-            HeartbeatIntervalMs = _kafkaConfig.Consumer.HeartbeatIntervalMs,
-            FetchMinBytes = _kafkaConfig.Consumer.FetchMinBytes,
-            FetchMaxWaitMs = _kafkaConfig.Consumer.FetchMaxWaitMs,
-            MaxPartitionFetchBytes = _kafkaConfig.Consumer.MaxPartitionFetchBytes,
-            CheckCrcs = _kafkaConfig.Consumer.CheckCrcs,
-            EnablePartitionEof = _kafkaConfig.Consumer.EnablePartitionEof
-        };
-
-        _consumer = new ConsumerBuilder<string, string>(config)
-            .SetErrorHandler((_, e) => _logger.LogError("Azure Consumer error: {Error}", e.Reason))
-            .SetPartitionsAssignedHandler((_, partitions) => 
-            {
-                _logger.LogInformation("Azure Consumer assigned partitions: [{Partitions}]", 
-                    string.Join(", ", partitions.Select(p => $"{p.Topic}[{p.Partition}]")));
-            })
-            .SetPartitionsRevokedHandler((_, partitions) => 
-            {
-                _logger.LogInformation("Azure Consumer revoked partitions: [{Partitions}]", 
-                    string.Join(", ", partitions.Select(p => $"{p.Topic}[{p.Partition}]")));
-            })
-            .Build();
-
+    private void ConfigureHttpClient()
+    {
+        _httpClient.BaseAddress = new Uri(_azureConfig.BaseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_azureConfig.TimeoutSeconds);
-        _logger.LogInformation("Azure Kafka Consumer initialized for group: {GroupId}", _kafkaConfig.Consumer.GroupId);
+        
+        if (!string.IsNullOrEmpty(_azureConfig.ApiKey))
+        {
+            _httpClient.DefaultRequestHeaders.Add("X-API-Key", _azureConfig.ApiKey);
+        }
     }
 
     public async Task StartConsumingAsync(CancellationToken cancellationToken)
     {
-        _consumer.Subscribe(_kafkaConfig.Topics.DataTopic);
+        var config = new ConsumerConfig
+        {
+            BootstrapServers = _kafkaConfig.Consumer.BootstrapServers,
+            GroupId = _kafkaConfig.Consumer.GroupId,
+            AutoOffsetReset = Enum.Parse<AutoOffsetReset>(_kafkaConfig.Consumer.AutoOffsetReset),
+            EnableAutoCommit = _kafkaConfig.Consumer.EnableAutoCommit,
+            SessionTimeoutMs = _kafkaConfig.Consumer.SessionTimeoutMs,
+            MaxPollIntervalMs = _kafkaConfig.Consumer.MaxPollIntervalMs,
+            EnablePartitionEof = _kafkaConfig.Consumer.EnablePartitionEof,
+            AllowAutoCreateTopics = _kafkaConfig.Consumer.AllowAutoCreateTopics,
+            IsolationLevel = Enum.Parse<IsolationLevel>(_kafkaConfig.Consumer.IsolationLevel)
+        };
+
+        _consumer = new ConsumerBuilder<string, string>(config)
+            .SetErrorHandler((_, e) => _logger.LogError("Consumer error: {Error}", e.Reason))
+            .SetLogHandler((_, message) => _logger.LogDebug("Consumer log: {Message}", message.Message))
+            .Build();
+
+        _consumer.Subscribe(_kafkaConfig.TopicName);
         _isConsuming = true;
 
-        _logger.LogInformation("Azure Consumer started consuming from topic: {Topic}", _kafkaConfig.Topics.DataTopic);
+        _logger.LogInformation("Azure Consumer started with idempotency. Group: {GroupId}, Topic: {Topic}", 
+            _consumerGroupId, _kafkaConfig.TopicName);
 
+        await ConsumeLoop(cancellationToken);
+    }
+
+    private async Task ConsumeLoop(CancellationToken cancellationToken)
+    {
         try
         {
-            while (!cancellationToken.IsCancellationRequested && _isConsuming)
+            while (_isConsuming && !cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult = _consumer.Consume(cancellationToken);
+                    var consumeResult = _consumer!.Consume(TimeSpan.FromMilliseconds(1000));
                     
-                    if (consumeResult?.Message?.Value != null)
+                    if (consumeResult?.Message != null)
                     {
-                        await ProcessConsumedMessage(consumeResult);
+                        await ProcessMessageWithIdempotency(consumeResult, cancellationToken);
                     }
                 }
                 catch (ConsumeException ex)
                 {
-                    _logger.LogError(ex, "Azure Consumer error: {Error}", ex.Error.Reason);
-                    
-                    if (ex.Error.IsFatal)
-                    {
-                        _logger.LogCritical("Fatal Azure Consumer error, stopping consumption");
-                        break;
-                    }
+                    _logger.LogError(ex, "Error consuming message from Kafka");
+                    await Task.Delay(1000, cancellationToken); // Brief pause on consume errors
                 }
                 catch (OperationCanceledException)
                 {
                     _logger.LogInformation("Azure Consumer operation cancelled");
                     break;
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error in Azure Consumer consumption loop");
-                    await Task.Delay(5000, cancellationToken); // Brief pause before retrying
-                }
             }
         }
-        finally
+        catch (Exception ex)
         {
-            _consumer.Close();
-            _logger.LogInformation("Azure Consumer stopped");
+            _logger.LogError(ex, "Critical error in Azure consumer loop");
+            throw;
         }
     }
 
-    public Task StopConsumingAsync()
+    private async Task ProcessMessageWithIdempotency(ConsumeResult<string, string> consumeResult, CancellationToken cancellationToken)
     {
-        _isConsuming = false;
-        return Task.CompletedTask;
-    }
-
-    private async Task ProcessConsumedMessage(ConsumeResult<string, string> consumeResult)
-    {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        DataSyncMessage? message = null;
+        var messageId = consumeResult.Message.Key ?? Guid.NewGuid().ToString();
+        var messageProcessingId = $"azure-{messageId}-{consumeResult.Offset}";
         
+        var processingStartTime = DateTime.UtcNow;
+        var messageSize = consumeResult.Message.Value?.Length ?? 0;
+        
+        _logger.LogDebug("Processing message {MessageId} from partition {Partition}, offset {Offset}, size: {Size} bytes",
+            messageProcessingId, consumeResult.Partition.Value, consumeResult.Offset.Value, messageSize);
+
         try
         {
-            message = JsonSerializer.Deserialize<DataSyncMessage>(consumeResult.Message.Value);
-            if (message == null)
+            // Check if message was already processed (idempotency check)
+            var alreadyProcessed = await _idempotencyService.IsMessageProcessedAsync(messageProcessingId, _consumerGroupId);
+            if (alreadyProcessed)
             {
-                _logger.LogWarning("Failed to deserialize message from partition {Partition} offset {Offset}", 
-                    consumeResult.Partition.Value, consumeResult.Offset.Value);
-                _consumer.Commit(consumeResult); // Commit to skip corrupted message
+                _logger.LogInformation("Duplicate message detected and skipped: {MessageId}", messageProcessingId);
+                
+                // Still commit the offset since we've "processed" this duplicate
+                CommitOffset(consumeResult);
                 return;
             }
 
-            _logger.LogDebug("Azure Consumer processing message {MessageId} from partition {Partition} offset {Offset}", 
-                message.Id, consumeResult.Partition.Value, consumeResult.Offset.Value);
+            // Try to acquire processing lock
+            var lockAcquired = await _idempotencyService.TryAcquireProcessingLockAsync(messageProcessingId, _consumerGroupId, 30000);
+            if (!lockAcquired)
+            {
+                _logger.LogWarning("Failed to acquire processing lock for message {MessageId}, skipping", messageProcessingId);
+                return; // Don't commit offset, let another consumer handle it
+            }
 
-            var success = await ProcessMessageAsync(message);
-
-            if (success)
+            bool processingResult = false;
+            try
             {
-                _consumer.Commit(consumeResult);
-                _logger.LogDebug("Azure Consumer successfully processed and committed message {MessageId} in {ElapsedMs}ms", 
-                    message.Id, sw.ElapsedMilliseconds);
-            }
-            else
-            {
-                _logger.LogWarning("Azure Consumer failed to process message {MessageId}, will NOT commit offset for retry", message.Id);
-                // Don't commit - let the message be retried on next poll
-            }
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogError(ex, "Azure Consumer failed to deserialize message from partition {Partition} offset {Offset}", 
-                consumeResult.Partition.Value, consumeResult.Offset.Value);
-            
-            // For JSON errors, commit to avoid infinite retries
-            _consumer.Commit(consumeResult);
-            
-            if (message != null)
-            {
-                var processingError = _retryService.CreateProcessingError(ex, message.Id, 0, "Azure-Consumer-Deserialization");
-                await _kafkaProducerService.PublishToDeadLetterQueueAsync(message, "JSON deserialization failed", processingError);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Azure Consumer unexpected error processing message from partition {Partition} offset {Offset}", 
-                consumeResult.Partition.Value, consumeResult.Offset.Value);
-            
-            if (message != null)
-            {
-                var processingError = _retryService.CreateProcessingError(ex, message.Id, 0, "Azure-Consumer-Processing");
-                await _kafkaProducerService.PublishToDeadLetterQueueAsync(message, "Unexpected processing error", processingError);
-            }
-        }
-    }
-
-    public async Task<bool> ProcessMessageAsync(DataSyncMessage message)
-    {
-        try
-        {
-            var success = await _retryService.ExecuteWithRetryAsync(
-                async () => await SaveToAzureEndpoint(message.Data),
-                ErrorType.Transient,
-                "SaveToAzureEndpoint",
-                message.CorrelationId);
-            
-            if (success)
-            {
-                _logger.LogInformation("Azure Consumer successfully saved message {MessageId} to Azure endpoint", message.Id);
-                return true;
-            }
-            
-            return false;
-        }
-        catch (Exception ex)
-        {
-            var errorType = ErrorClassifier.ClassifyException(ex);
-            var processingError = _retryService.CreateProcessingError(
-                ex, 
-                message.Id, 
-                message.RetryCount, 
-                "Azure-Consumer",
-                new Dictionary<string, string>
+                // Parse and process the message
+                var dataMessage = JsonSerializer.Deserialize<DataSyncMessage>(consumeResult.Message.Value);
+                if (dataMessage == null)
                 {
-                    { "Endpoint", _azureConfig.BaseUrl },
-                    { "ConsumerGroup", _kafkaConfig.Consumer.GroupId },
-                    { "MessageTimestamp", message.Timestamp.ToString("O") }
-                });
+                    throw new InvalidOperationException("Failed to deserialize message");
+                }
 
-            _logger.LogError(ex, "Azure Consumer failed to process message {MessageId} after retries, sending to DLQ. Error type: {ErrorType}", 
-                message.Id, errorType);
+                // Process the message with retry logic
+                await _retryService.ExecuteWithRetryAsync(
+                    operation: () => SaveToAzureEndpoint(dataMessage),
+                    operationName: "SaveToAzureEndpoint",
+                    correlationId: messageProcessingId
+                );
 
-            await _kafkaProducerService.PublishToDeadLetterQueueAsync(
-                message, 
-                $"Failed to save to Azure endpoint after {_errorConfig.TransientErrors.MaxRetries} retries: {ex.Message}", 
-                processingError);
-            
-            return false;
-        }
-    }
+                processingResult = true;
+                var processingDuration = DateTime.UtcNow - processingStartTime;
+                
+                _logger.LogInformation("Successfully processed Azure message {MessageId} in {Duration}ms", 
+                    messageProcessingId, processingDuration.TotalMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                processingResult = false;
+                var errorType = _errorClassifier.ClassifyError(ex);
+                var processingDuration = DateTime.UtcNow - processingStartTime;
+                
+                _logger.LogError(ex, "Failed to process Azure message {MessageId} after {Duration}ms. Error type: {ErrorType}", 
+                    messageProcessingId, processingDuration.TotalMilliseconds, errorType);
+                
+                // Don't commit offset on processing failure - let Kafka retry
+                return;
+            }
+            finally
+            {
+                // Release processing lock
+                await _idempotencyService.ReleaseProcessingLockAsync(messageProcessingId, _consumerGroupId);
+            }
 
-    private async Task<bool> SaveToAzureEndpoint(string jsonData)
-    {
-        try
-        {
-            _logger.LogDebug("Azure Consumer: Saving data to Azure endpoint: {BaseUrl}", _azureConfig.BaseUrl);
+            // Mark message as processed for idempotency
+            await _idempotencyService.MarkMessageProcessedAsync(messageProcessingId, _consumerGroupId, processingResult);
 
-            // Simulate different types of failures for testing
-            await SimulateFailuresForTesting();
-
-            // In production, this would be:
-            // var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
-            // var response = await _httpClient.PostAsync($"{_azureConfig.BaseUrl}/api/sync", content);
-            // 
-            // if (!response.IsSuccessStatusCode)
-            // {
-            //     var errorType = ErrorClassifier.ClassifyHttpStatusCode(response.StatusCode);
-            //     throw new HttpRequestException($"Azure endpoint returned {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
-            // }
-            // 
-            // return response.IsSuccessStatusCode;
-
-            await Task.Delay(15); // Simulate slightly different processing time than AWS
-            return true;
+            // Commit offset only after successful processing and idempotency marking
+            CommitOffset(consumeResult);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Azure Consumer error saving to Azure endpoint");
-            throw; // Re-throw for retry logic
+            _logger.LogError(ex, "Critical error processing message {MessageId}", messageProcessingId);
+            
+            // Release lock on critical error
+            try
+            {
+                await _idempotencyService.ReleaseProcessingLockAsync(messageProcessingId, _consumerGroupId);
+            }
+            catch (Exception lockEx)
+            {
+                _logger.LogError(lockEx, "Failed to release processing lock for message {MessageId}", messageProcessingId);
+            }
         }
     }
 
-    private async Task SimulateFailuresForTesting()
+    private void CommitOffset(ConsumeResult<string, string> consumeResult)
     {
-        // This method simulates different types of failures for testing purposes
-        // Remove this in production
+        try
+        {
+            _consumer?.Commit(consumeResult);
+            _logger.LogTrace("Committed offset {Offset} for partition {Partition}", 
+                consumeResult.Offset.Value, consumeResult.Partition.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to commit offset {Offset} for partition {Partition}", 
+                consumeResult.Offset.Value, consumeResult.Partition.Value);
+        }
+    }
+
+    private async Task SaveToAzureEndpoint(DataSyncMessage message)
+    {
+        // Simulate different types of failures for testing
+        await SimulateProcessingConditions();
+
+        var jsonPayload = JsonSerializer.Serialize(new
+        {
+            Id = message.Id,
+            Data = message.Data,
+            Timestamp = message.Timestamp,
+            Source = "Azure-Consumer",
+            ProcessedAt = DateTime.UtcNow
+        });
+
+        var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
+        
+        try
+        {
+            var response = await _httpClient.PostAsync("/api/sync/azure", content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"Azure endpoint returned {response.StatusCode}: {errorContent}");
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            _logger.LogDebug("Azure endpoint response: {Response}", responseContent);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error calling Azure endpoint for message {MessageId}", message.Id);
+            throw;
+        }
+        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        {
+            _logger.LogError(ex, "Timeout calling Azure endpoint for message {MessageId}", message.Id);
+            throw new TimeoutException($"Azure endpoint timeout for message {message.Id}", ex);
+        }
+    }
+
+    private async Task SimulateProcessingConditions()
+    {
+        // For testing different error scenarios with slightly different patterns than AWS
         var random = new Random();
-        var failureType = random.Next(1, 100);
+        var scenario = random.Next(100);
 
-        if (failureType <= 8) // 8% chance of timeout (slightly different from AWS)
+        if (scenario < 3) // 3% timeout (slightly higher than AWS)
         {
-            await Task.Delay(TimeSpan.FromSeconds(_azureConfig.TimeoutSeconds + 1));
-            throw new TimeoutException("Azure endpoint timeout");
+            _logger.LogDebug("Simulating Azure timeout condition");
+            await Task.Delay(35000); // Longer than HttpClient timeout
         }
-        else if (failureType <= 12) // 4% chance of network error
+        else if (scenario < 5) // 2% network error
         {
-            throw new HttpRequestException("Azure network connection failed");
+            _logger.LogDebug("Simulating Azure network error");
+            throw new HttpRequestException("Simulated Azure network connectivity issue");
         }
-        else if (failureType <= 17) // 5% chance of server error
+        else if (scenario < 7) // 2% rate limiting
         {
-            throw new HttpRequestException("Azure internal server error", null, HttpStatusCode.InternalServerError);
+            _logger.LogDebug("Simulating Azure rate limiting");
+            throw new HttpRequestException("Rate limited by Azure API");
         }
-        else if (failureType <= 19) // 2% chance of rate limiting
+        else if (scenario < 9) // 2% authentication error
         {
-            throw new HttpRequestException("Rate limited", null, HttpStatusCode.TooManyRequests);
+            _logger.LogDebug("Simulating Azure authentication error");
+            throw new UnauthorizedAccessException("Simulated Azure authentication failure");
         }
-        else if (failureType <= 20) // 1% chance of auth error (non-retryable)
-        {
-            throw new HttpRequestException("Azure unauthorized", null, HttpStatusCode.Unauthorized);
-        }
-        // 80% success rate (slightly higher than AWS for testing variety)
+        // 91% success - slightly different from AWS for testing variety
     }
 
-    private static AutoOffsetReset ParseAutoOffsetReset(string autoOffsetReset)
+    public async Task StopConsumingAsync()
     {
-        return autoOffsetReset.ToLowerInvariant() switch
+        _logger.LogInformation("Stopping Azure consumer...");
+        _isConsuming = false;
+        
+        try
         {
-            "earliest" => AutoOffsetReset.Earliest,
-            "latest" => AutoOffsetReset.Latest,
-            "error" => AutoOffsetReset.Error,
-            _ => AutoOffsetReset.Earliest
-        };
+            _consumer?.Close();
+            await Task.Delay(1000); // Allow graceful shutdown
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error stopping Azure consumer");
+        }
     }
 
     public void Dispose()
     {
-        if (!_disposed)
+        try
         {
-            _isConsuming = false;
-            _consumer?.Close();
             _consumer?.Dispose();
-            _disposed = true;
-            _logger.LogInformation("Azure Kafka Consumer disposed");
+            _httpClient?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disposing Azure consumer service");
         }
     }
 } 
