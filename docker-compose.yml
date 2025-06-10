@@ -243,6 +243,40 @@ services:
       "
     restart: "no"
 
+  # AWS Kafka Consumer Service
+  aws-consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws-consumer
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - Kafka__BootstrapServers=kafka:29092
+      - Kafka__Consumer__GroupId=aws-sync-group
+      - Kafka__Consumer__ClientId=cloudsync-aws-consumer
+      - AwsEndpoint__BaseUrl=https://api.aws-example.com
+      - DOTNET_GCServer=1
+      - DOTNET_GCConcurrent=1
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'CloudSync.KafkaAwsConsumer' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   # Optional monitoring service for performance insights
   monitoring:
     image: prom/prometheus:latest
