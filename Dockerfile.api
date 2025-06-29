@@ -8,11 +8,18 @@ RUN apk add --no-cache \
     curl \
     procps \
     htop \
+    icu-libs \
     && rm -rf /var/cache/apk/*
 
 # Use the SDK image to build the application
 FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 WORKDIR /src
+
+# Clear any existing NuGet configuration that might reference Windows paths
+RUN dotnet nuget locals all --clear
+
+# Copy NuGet configuration first
+COPY NuGet.config ./
 
 # Copy project files
 COPY CloudSync.Api/CloudSync.Api.csproj CloudSync.Api/
@@ -21,15 +28,15 @@ COPY CloudSync.Data/CloudSync.Data.csproj CloudSync.Data/
 COPY CloudSync.Infrastructure/CloudSync.Infrastructure.csproj CloudSync.Infrastructure/
 COPY CloudSync.Common/CloudSync.Common.csproj CloudSync.Common/
 
-# Restore dependencies
-RUN dotnet restore CloudSync.Api/CloudSync.Api.csproj
+# Restore dependencies with explicit NuGet configuration
+RUN dotnet restore CloudSync.Api/CloudSync.Api.csproj --verbosity normal
 
 # Copy the source code
 COPY . .
 
 # Build the application
 WORKDIR /src/CloudSync.Api
-RUN dotnet build CloudSync.Api.csproj -c Release -o /app/build
+RUN dotnet build CloudSync.Api.csproj -c Release -o /app/build --no-restore
 
 # Publish the application
 FROM build AS publish
@@ -55,8 +62,7 @@ ENV DOTNET_GCServer=1 \
     DOTNET_GCConcurrent=1 \
     DOTNET_GCRetainVM=1 \
     DOTNET_ThreadPool_UnfairSemaphoreSpinLimit=6 \
-    ASPNETCORE_URLS=http://+:80 \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+    ASPNETCORE_URLS=http://+:80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

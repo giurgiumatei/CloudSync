@@ -1,0 +1,389 @@
+{
+  "Round": 4,
+  "RequestRate": 10,
+  "Timestamp": "2025-06-29T00:22:19.7685889+00:00",
+  "Results": {
+    "TotalRequests": 583,
+    "SuccessCount": 466,
+    "ErrorCount": 117,
+    "SuccessRate": 0.7993138936535163,
+    "ErrorRate": 0.20068610634648365,
+    "ActualRPS": 9.701721956300279,
+    "AvgResponseTimeMs": 13.101200686106347,
+    "MinResponseTimeMs": 0,
+    "MaxResponseTimeMs": 253,
+    "MedianResponseTimeMs": 14,
+    "P50ResponseTimeMs": 14,
+    "P90ResponseTimeMs": 18,
+    "P95ResponseTimeMs": 19,
+    "P99ResponseTimeMs": 20,
+    "ThroughputRPS": 9.701721956300279,
+    "TestDurationSeconds": 60.0924251,
+    "StatusCodeDistribution": {
+      "200": 466,
+      "0": 117
+    }
+  },
+  "ResourceUsages": [
+    {
+      "Timestamp": "2025-06-29T00:21:27.0177784Z",
+      "CpuTimeMs": 2010.825,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:21.0188746Z",
+      "CpuTimeMs": 1977.359,
+      "WorkingSetMB": 60,
+      "ThreadCount": 14
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:20.017895Z",
+      "CpuTimeMs": 1957.889,
+      "WorkingSetMB": 60,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:16.0167037Z",
+      "CpuTimeMs": 2408.012,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:15.0154965Z",
+      "CpuTimeMs": 2401.115,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:14.0191047Z",
+      "CpuTimeMs": 2394.228,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:13.0227947Z",
+      "CpuTimeMs": 2386.404,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:12.0182458Z",
+      "CpuTimeMs": 2378.524,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:11.019916Z",
+      "CpuTimeMs": 2370.433,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:10.0203933Z",
+      "CpuTimeMs": 2363.318,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:09.0198401Z",
+      "CpuTimeMs": 2356.577,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:08.0224246Z",
+      "CpuTimeMs": 2347.05,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:07.0177521Z",
+      "CpuTimeMs": 2340.19,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:06.0185161Z",
+      "CpuTimeMs": 2332.942,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:05.0189758Z",
+      "CpuTimeMs": 2327.376,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:04.0180265Z",
+      "CpuTimeMs": 2318.983,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:03.018635Z",
+      "CpuTimeMs": 2311.22,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:02.0183898Z",
+      "CpuTimeMs": 2304.156,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:01.0181758Z",
+      "CpuTimeMs": 2298.034,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:00.0230075Z",
+      "CpuTimeMs": 2290.271,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:50.0173352Z",
+      "CpuTimeMs": 2210.609,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:49.0187669Z",
+      "CpuTimeMs": 2201.963,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:48.0177485Z",
+      "CpuTimeMs": 2192.854,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:47.0178582Z",
+      "CpuTimeMs": 2184.654,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:46.021915Z",
+      "CpuTimeMs": 2175.213,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:45.019318Z",
+      "CpuTimeMs": 2168.789,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:44.0179474Z",
+      "CpuTimeMs": 2159.224,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:43.021328Z",
+      "CpuTimeMs": 2149.425,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:42.0177092Z",
+      "CpuTimeMs": 2138.36,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:41.0229951Z",
+      "CpuTimeMs": 2126.456,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:40.0205016Z",
+      "CpuTimeMs": 2117.214,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:30.0190255Z",
+      "CpuTimeMs": 2047.317,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:25.0177571Z",
+      "CpuTimeMs": 2000.85,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:24.0177785Z",
+      "CpuTimeMs": 1995.903,
+      "WorkingSetMB": 59,
+      "ThreadCount": 14
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:23.0179297Z",
+      "CpuTimeMs": 1991.03,
+      "WorkingSetMB": 59,
+      "ThreadCount": 14
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:31.0177191Z",
+      "CpuTimeMs": 2059.79,
+      "WorkingSetMB": 59,
+      "ThreadCount": 14
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:29.0200763Z",
+      "CpuTimeMs": 2030.449,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:28.018205Z",
+      "CpuTimeMs": 2016.134,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:26.0179177Z",
+      "CpuTimeMs": 2005.802,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:22.0177129Z",
+      "CpuTimeMs": 1986.347,
+      "WorkingSetMB": 59,
+      "ThreadCount": 14
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:19.0172184Z",
+      "CpuTimeMs": 2430.389,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:18.016649Z",
+      "CpuTimeMs": 2422.198,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:22:17.0164398Z",
+      "CpuTimeMs": 2415.582,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:59.0177386Z",
+      "CpuTimeMs": 2283.087,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:58.02063Z",
+      "CpuTimeMs": 2275.297,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:57.0183704Z",
+      "CpuTimeMs": 2268.76,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:56.0185306Z",
+      "CpuTimeMs": 2262.295,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:55.0196351Z",
+      "CpuTimeMs": 2256.193,
+      "WorkingSetMB": 59,
+      "ThreadCount": 13
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:54.0208957Z",
+      "CpuTimeMs": 2247.132,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:53.0179707Z",
+      "CpuTimeMs": 2238.68,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:52.0186792Z",
+      "CpuTimeMs": 2230.104,
+      "WorkingSetMB": 59,
+      "ThreadCount": 12
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:51.0220065Z",
+      "CpuTimeMs": 2219.138,
+      "WorkingSetMB": 59,
+      "ThreadCount": 16
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:39.0182484Z",
+      "CpuTimeMs": 2110.102,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:38.0179778Z",
+      "CpuTimeMs": 2102.071,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:37.0179687Z",
+      "CpuTimeMs": 2094.707,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:36.0179836Z",
+      "CpuTimeMs": 2090.6,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:35.0181646Z",
+      "CpuTimeMs": 2082.852,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:34.0192207Z",
+      "CpuTimeMs": 2078.282,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:33.018634Z",
+      "CpuTimeMs": 2074.351,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    },
+    {
+      "Timestamp": "2025-06-29T00:21:32.0185565Z",
+      "CpuTimeMs": 2070.573,
+      "WorkingSetMB": 59,
+      "ThreadCount": 17
+    }
+  ]
+}

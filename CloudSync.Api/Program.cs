@@ -17,6 +17,17 @@ builder.Services.AddScoped<ISyncService, SyncService>();
 
 var app = builder.Build();
 
+// Initialize databases
+using (var scope = app.Services.CreateScope())
+{
+    var azureContext = scope.ServiceProvider.GetRequiredService<AzureDbContext>();
+    var awsContext = scope.ServiceProvider.GetRequiredService<AwsDbContext>();
+    
+    // Ensure databases are created
+    await azureContext.Database.EnsureCreatedAsync();
+    await awsContext.Database.EnsureCreatedAsync();
+}
+
 app.MapControllers();
 
 app.Run();

@@ -6,16 +6,17 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports:
-      - "5000:80"
+      - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__AzureConnection=Server=azure-db;Database=AzureDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
-      - ConnectionStrings__AwsConnection=Server=aws-db;Database=AwsDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
+      - ConnectionStrings__AzureConnection=Server=azure-db;Database=AzureDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;MultipleActiveResultSets=true;
+      - ConnectionStrings__AwsConnection=Server=aws-db;Database=AwsDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;MultipleActiveResultSets=true;
       - ASPNETCORE_URLS=http://+:80
       # Performance optimizations
       - DOTNET_GCServer=1
       - DOTNET_GCConcurrent=1
       - DOTNET_GCRetainVM=1
+      - DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=0
     depends_on:
       - azure-db
       - aws-db
@@ -124,6 +125,23 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
     restart: unless-stopped
     profiles:
       - monitoring
