@@ -47,8 +47,11 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
     {
         try
         {
-            var groupCache = _processedMessages.GetOrAdd(consumerGroup, 
-                _ => new ConcurrentDictionary<string, ProcessedMessageInfo>());
+            if (!_processedMessages.TryGetValue(consumerGroup, out var groupCache))
+            {
+                groupCache = new ConcurrentDictionary<string, ProcessedMessageInfo>();
+                _processedMessages.TryAdd(consumerGroup, groupCache);
+            }
 
             var isProcessed = groupCache.ContainsKey(messageId);
 
@@ -63,8 +66,11 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
                         stats.DuplicateMessagesDetected++;
                     }
                     
-                    var groupStats = stats.ConsumerGroupStats.GetOrAdd(consumerGroup, 
-                        _ => new ConsumerGroupStats { GroupName = consumerGroup });
+                    if (!stats.ConsumerGroupStats.TryGetValue(consumerGroup, out var groupStats))
+                    {
+                        groupStats = new ConsumerGroupStats { GroupName = consumerGroup };
+                        stats.ConsumerGroupStats.TryAdd(consumerGroup, groupStats);
+                    }
                     if (isProcessed)
                     {
                         groupStats.DuplicatesDetected++;
@@ -93,8 +99,11 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
     {
         try
         {
-            var groupCache = _processedMessages.GetOrAdd(consumerGroup, 
-                _ => new ConcurrentDictionary<string, ProcessedMessageInfo>());
+            if (!_processedMessages.TryGetValue(consumerGroup, out var groupCache))
+            {
+                groupCache = new ConcurrentDictionary<string, ProcessedMessageInfo>();
+                _processedMessages.TryAdd(consumerGroup, groupCache);
+            }
 
             var processedInfo = new ProcessedMessageInfo
             {
@@ -121,8 +130,11 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
                 {
                     stats.UniqueMessagesProcessed++;
                     
-                    var groupStats = stats.ConsumerGroupStats.GetOrAdd(consumerGroup, 
-                        _ => new ConsumerGroupStats { GroupName = consumerGroup });
+                    if (!stats.ConsumerGroupStats.TryGetValue(consumerGroup, out var groupStats))
+                    {
+                        groupStats = new ConsumerGroupStats { GroupName = consumerGroup };
+                        stats.ConsumerGroupStats.TryAdd(consumerGroup, groupStats);
+                    }
                     groupStats.MessagesProcessed++;
                     groupStats.CacheSize = groupCache.Count;
                     groupStats.LastActivity = DateTime.UtcNow;
@@ -213,6 +225,8 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
 
     public async Task<IdempotencyStats> GetStatsAsync()
     {
+        IdempotencyStats statsCopy;
+        
         lock (_statsLock)
         {
             // Update current cache sizes
@@ -220,13 +234,16 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
             
             foreach (var kvp in _processedMessages)
             {
-                var groupStats = _stats.ConsumerGroupStats.GetOrAdd(kvp.Key, 
-                    _ => new ConsumerGroupStats { GroupName = kvp.Key });
+                if (!_stats.ConsumerGroupStats.TryGetValue(kvp.Key, out var groupStats))
+                {
+                    groupStats = new ConsumerGroupStats { GroupName = kvp.Key };
+                    _stats.ConsumerGroupStats.TryAdd(kvp.Key, groupStats);
+                }
                 groupStats.CacheSize = kvp.Value.Count;
             }
 
             // Create a deep copy for thread safety
-            var statsCopy = new IdempotencyStats
+            statsCopy = new IdempotencyStats
             {
                 TotalMessagesChecked = _stats.TotalMessagesChecked,
                 DuplicateMessagesDetected = _stats.DuplicateMessagesDetected,
@@ -236,11 +253,11 @@ public class InMemoryIdempotencyService : IIdempotencyService, IDisposable
                 ExpiredEntriesCleanedUp = _stats.ExpiredEntriesCleanedUp,
                 CurrentCacheSize = _stats.CurrentCacheSize,
                 LastCleanupTime = _stats.LastCleanupTime,
-                ConsumerGroupStats = new Dictionary<string, ConsumerGroupStats>(_stats.ConsumerGroupStats)
+                ConsumerGroupStats = new ConcurrentDictionary<string, ConsumerGroupStats>(_stats.ConsumerGroupStats)
             };
-
-            return await Task.FromResult(statsCopy);
         }
+
+        return await Task.FromResult(statsCopy);
     }
 
     private void PerformCleanup(object? state)

@@ -3,16 +3,17 @@ using CloudSync.Core.Services;
 using CloudSync.Core.Services.Interfaces;
 using CloudSync.Data.Contexts;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<AzureDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AzureConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AzureConnection")));
 
 builder.Services.AddDbContext<AwsDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("AwsConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AwsConnection")));
 
 // Configure Kafka
 builder.Services.Configure<KafkaConfiguration>(builder.Configuration.GetSection("Kafka"));
@@ -23,8 +24,8 @@ builder.Services.AddSingleton<IKafkaProducerService, KafkaProducerService>();
 
 // Add health checks
 builder.Services.AddHealthChecks()
-    .AddSqlServer(builder.Configuration.GetConnectionString("AzureConnection")!, name: "azure-db")
-    .AddSqlServer(builder.Configuration.GetConnectionString("AwsConnection")!, name: "aws-db");
+    .AddNpgSql(builder.Configuration.GetConnectionString("AzureConnection")!, name: "azure-db")
+    .AddNpgSql(builder.Configuration.GetConnectionString("AwsConnection")!, name: "aws-db");
 
 var app = builder.Build();
 

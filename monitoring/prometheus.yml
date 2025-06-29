@@ -11,6 +11,12 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
   - job_name: 'cloudsync-api'
     static_configs:
       - targets: ['api:80']

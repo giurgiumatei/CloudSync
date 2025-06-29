@@ -6,14 +6,14 @@ namespace CloudSync.KafkaAzureConsumer.Services;
 
 public class AzureConsumerHostedService : BackgroundService
 {
-    private readonly IKafkaConsumerService _consumerService;
+    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AzureConsumerHostedService> _logger;
 
     public AzureConsumerHostedService(
-        IKafkaConsumerService consumerService,
+        IServiceProvider serviceProvider,
         ILogger<AzureConsumerHostedService> logger)
     {
-        _consumerService = consumerService;
+        _serviceProvider = serviceProvider;
         _logger = logger;
     }
 
@@ -23,7 +23,9 @@ public class AzureConsumerHostedService : BackgroundService
 
         try
         {
-            await _consumerService.StartConsumingAsync(stoppingToken);
+            using var scope = _serviceProvider.CreateScope();
+            var consumerService = scope.ServiceProvider.GetRequiredService<IKafkaConsumerService>();
+            await consumerService.StartConsumingAsync(stoppingToken);
         }
         catch (OperationCanceledException)
         {
@@ -39,7 +41,9 @@ public class AzureConsumerHostedService : BackgroundService
     {
         _logger.LogInformation("Azure Consumer Hosted Service stopping...");
         
-        await _consumerService.StopConsumingAsync();
+        using var scope = _serviceProvider.CreateScope();
+        var consumerService = scope.ServiceProvider.GetRequiredService<IKafkaConsumerService>();
+        await consumerService.StopConsumingAsync();
         await base.StopAsync(cancellationToken);
         
         _logger.LogInformation("Azure Consumer Hosted Service stopped");

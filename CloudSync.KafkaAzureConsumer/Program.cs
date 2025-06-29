@@ -1,14 +1,19 @@
 using CloudSync.Core.Configuration;
 using CloudSync.Core.Services;
 using CloudSync.Core.Services.Interfaces;
-using CloudSync.KafkaAzureConsumer.Configuration;
 using CloudSync.KafkaAzureConsumer.Services;
+using CloudSync.Data.Contexts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using CloudSync.Core.DTOs;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 // Configure configuration sources
 builder.Configuration
@@ -28,23 +33,37 @@ builder.Services.Configure<ErrorHandlingConfiguration>(builder.Configuration.Get
 builder.Services.Configure<RetryConfiguration>(builder.Configuration.GetSection("ErrorHandling:RetryConfiguration"));
 builder.Services.Configure<IdempotencyConfiguration>(builder.Configuration.GetSection("Idempotency"));
 
-// Register HTTP client
-builder.Services.AddHttpClient<AzureKafkaConsumerService>();
+// Register database context
+builder.Services.AddDbContext<AzureDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AzureConnection")));
+
+// Add health checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AzureDbContext>("azure-db", tags: new[] { "database", "azure" });
 
 // Register services
-builder.Services.AddSingleton<IRetryService, RetryService>();
 builder.Services.AddSingleton<IErrorClassifier, ErrorClassifier>();
+builder.Services.AddSingleton<IRetryService>(sp =>
+    new RetryService(
+        sp.GetRequiredService<IOptions<RetryConfiguration>>().Value,
+        sp.GetRequiredService<ILogger<RetryService>>(),
+        sp.GetRequiredService<IErrorClassifier>()));
 builder.Services.AddSingleton<IIdempotencyService, InMemoryIdempotencyService>();
-builder.Services.AddSingleton<IAzureKafkaConsumerService, AzureKafkaConsumerService>();
+builder.Services.AddScoped<IAzureKafkaConsumerService, AzureKafkaConsumerService>();
+builder.Services.AddScoped<IKafkaConsumerService, AzureKafkaConsumerService>();
 
 // Register the hosted service
 builder.Services.AddHostedService<AzureConsumerHostedService>();
 
-// Build and run the host
-var host = builder.Build();
+// Build the application
+var app = builder.Build();
 
-var logger = host.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("Starting Azure Kafka Consumer Application with enhanced error handling");
+// Configure health check endpoints
+app.MapHealthChecks("/healthcheck");
+app.MapHealthChecks("/health");
+
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("Starting Azure Kafka Consumer Application with enhanced error handling and health checks");
 
 // Configure graceful shutdown
 var cancellationTokenSource = new CancellationTokenSource();
@@ -56,7 +75,7 @@ Console.CancelKeyPress += (_, e) =>
 
 try
 {
-    await host.RunAsync(cancellationTokenSource.Token);
+    await app.RunAsync(cancellationTokenSource.Token);
 }
 catch (OperationCanceledException)
 {

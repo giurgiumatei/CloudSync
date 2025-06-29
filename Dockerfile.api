@@ -1,20 +1,26 @@
-# Use the official .NET 9 runtime as base image
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS base
+# Use the official .NET 8 runtime as base image (Debian-based for better native library support)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 80
 
 # Install required packages for performance and debugging
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     curl \
     procps \
     htop \
-    icu-libs \
-    icu-data-full \
-    && rm -rf /var/cache/apk/*
+    libicu-dev \
+    librdkafka-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Use the SDK image to build the application
-FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+
+# Clear any existing NuGet configuration that might reference Windows paths
+RUN dotnet nuget locals all --clear
+
+# Copy NuGet configuration first
+COPY NuGet.config ./
 
 # Copy project files
 COPY CloudSync.Api/CloudSync.Api.csproj CloudSync.Api/
@@ -47,8 +53,8 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 
 # Create a non-root user for security
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -S appuser -G appgroup -u 1001
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/bash appuser
 RUN chown -R appuser:appgroup /app
 USER appuser
 

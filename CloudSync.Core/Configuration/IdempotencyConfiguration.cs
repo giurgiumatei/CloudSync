@@ -1,4 +1,5 @@
 namespace CloudSync.Core.Configuration;
+using System.Collections.Concurrent;
 
 public class IdempotencyConfiguration
 {
@@ -41,6 +42,8 @@ public class IdempotencyConfiguration
     /// Whether to track processing statistics
     /// </summary>
     public bool EnableStatistics { get; set; } = true;
+
+    public ConcurrentDictionary<string, ConsumerGroupStats> ConsumerGroupStats { get; set; } = new();
 }
 
 public class IdempotencyStats
@@ -53,7 +56,7 @@ public class IdempotencyStats
     public long ExpiredEntriesCleanedUp { get; set; }
     public int CurrentCacheSize { get; set; }
     public DateTime LastCleanupTime { get; set; }
-    public Dictionary<string, ConsumerGroupStats> ConsumerGroupStats { get; set; } = new();
+    public ConcurrentDictionary<string, ConsumerGroupStats> ConsumerGroupStats { get; set; } = new();
 
     public double DuplicationRate => TotalMessagesChecked > 0 
         ? (double)DuplicateMessagesDetected / TotalMessagesChecked * 100 

@@ -1,21 +1,24 @@
 using CloudSync.Core.Configuration;
 using CloudSync.Core.DTOs;
+using CloudSync.Core.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 
 namespace CloudSync.Core.Services;
 
-public class RetryService
+public class RetryService : IRetryService
 {
     private readonly RetryConfiguration _config;
     private readonly ILogger<RetryService> _logger;
     private readonly CircuitBreakerState _circuitBreaker;
     private readonly Random _random = new();
+    private readonly IErrorClassifier _errorClassifier;
 
-    public RetryService(RetryConfiguration config, ILogger<RetryService> logger)
+    public RetryService(RetryConfiguration config, ILogger<RetryService> logger, IErrorClassifier errorClassifier)
     {
         _config = config;
         _logger = logger;
         _circuitBreaker = new CircuitBreakerState(_config);
+        _errorClassifier = errorClassifier;
     }
 
     public async Task<T> ExecuteWithRetryAsync<T>(
@@ -53,7 +56,7 @@ public class RetryService
             catch (Exception ex)
             {
                 lastException = ex;
-                var classifiedError = ErrorClassifier.ClassifyException(ex);
+                var classifiedError = _errorClassifier.ClassifyError(ex);
                 
                 _logger.LogWarning(ex, "Operation {OperationName} failed on attempt {Attempt}/{MaxRetries}, error type: {ErrorType}, correlation: {CorrelationId}",
                     operationName, attempt + 1, _config.MaxRetries + 1, classifiedError, correlationId);
@@ -61,7 +64,7 @@ public class RetryService
                 _circuitBreaker.RecordFailure();
 
                 // Check if error is retryable
-                if (!ErrorClassifier.IsRetryable(classifiedError))
+                if (!_errorClassifier.IsRetryable(classifiedError))
                 {
                     _logger.LogError("Operation {OperationName} failed with non-retryable error: {ErrorType}, correlation: {CorrelationId}",
                         operationName, classifiedError, correlationId);
@@ -125,8 +128,8 @@ public class RetryService
         string? source = null,
         Dictionary<string, string>? context = null)
     {
-        var errorType = ErrorClassifier.ClassifyException(exception);
-        var severity = ErrorClassifier.GetErrorSeverity(errorType);
+        var errorType = _errorClassifier.ClassifyError(exception);
+        var severity = _errorClassifier.GetErrorSeverity(errorType);
 
         return new ProcessingError
         {

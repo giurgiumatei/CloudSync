@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using CloudSync.Core.Services.Interfaces;
 
 namespace CloudSync.Core.DTOs;
 
@@ -38,8 +40,13 @@ public class ProcessingError
     public Dictionary<string, string> Context { get; set; } = new();
 }
 
-public static class ErrorClassifier
+public class ErrorClassifier : IErrorClassifier
 {
+    public ErrorType ClassifyError(Exception exception)
+    {
+        return ClassifyException(exception);
+    }
+
     public static ErrorType ClassifyException(Exception exception)
     {
         return exception switch
@@ -54,7 +61,12 @@ public static class ErrorClassifier
         };
     }
 
-    public static ErrorType ClassifyHttpStatusCode(HttpStatusCode statusCode)
+    public ErrorType ClassifyHttpStatusCode(HttpStatusCode statusCode)
+    {
+        return ClassifyHttpStatusCodeStatic(statusCode);
+    }
+
+    private static ErrorType ClassifyHttpStatusCodeStatic(HttpStatusCode statusCode)
     {
         return statusCode switch
         {
@@ -90,7 +102,12 @@ public static class ErrorClassifier
         return ErrorType.Transient;
     }
 
-    public static ErrorSeverity GetErrorSeverity(ErrorType errorType)
+    public ErrorSeverity GetErrorSeverity(ErrorType errorType)
+    {
+        return GetErrorSeverityStatic(errorType);
+    }
+
+    private static ErrorSeverity GetErrorSeverityStatic(ErrorType errorType)
     {
         return errorType switch
         {
@@ -107,7 +124,12 @@ public static class ErrorClassifier
         };
     }
 
-    public static bool IsRetryable(ErrorType errorType)
+    public bool IsRetryable(ErrorType errorType)
+    {
+        return IsRetryableStatic(errorType);
+    }
+
+    private static bool IsRetryableStatic(ErrorType errorType)
     {
         return errorType switch
         {

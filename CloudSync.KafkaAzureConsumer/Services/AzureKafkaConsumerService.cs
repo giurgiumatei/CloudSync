@@ -1,8 +1,10 @@
 using CloudSync.Core.Configuration;
 using CloudSync.Core.DTOs;
 using CloudSync.Core.Services.Interfaces;
-using CloudSync.KafkaAzureConsumer.Configuration;
+using CloudSync.Data.Contexts;
+using CloudSync.Data.Entities;
 using Confluent.Kafka;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -15,7 +17,7 @@ public interface IAzureKafkaConsumerService
     Task StopConsumingAsync();
 }
 
-public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
+public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IKafkaConsumerService, IDisposable
 {
     private readonly ILogger<AzureKafkaConsumerService> _logger;
     private readonly KafkaConfiguration _kafkaConfig;
@@ -23,7 +25,7 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
     private readonly IRetryService _retryService;
     private readonly IErrorClassifier _errorClassifier;
     private readonly IIdempotencyService _idempotencyService;
-    private readonly HttpClient _httpClient;
+    private readonly AzureDbContext _azureDbContext;
     private IConsumer<string, string>? _consumer;
     private readonly string _consumerGroupId = "azure-sync-group";
     private bool _isConsuming = false;
@@ -35,7 +37,7 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
         IRetryService retryService,
         IErrorClassifier errorClassifier,
         IIdempotencyService idempotencyService,
-        HttpClient httpClient)
+        AzureDbContext azureDbContext)
     {
         _logger = logger;
         _kafkaConfig = kafkaConfig.Value;
@@ -43,35 +45,20 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
         _retryService = retryService;
         _errorClassifier = errorClassifier;
         _idempotencyService = idempotencyService;
-        _httpClient = httpClient;
-        
-        ConfigureHttpClient();
-    }
-
-    private void ConfigureHttpClient()
-    {
-        _httpClient.BaseAddress = new Uri(_azureConfig.BaseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(_azureConfig.TimeoutSeconds);
-        
-        if (!string.IsNullOrEmpty(_azureConfig.ApiKey))
-        {
-            _httpClient.DefaultRequestHeaders.Add("X-API-Key", _azureConfig.ApiKey);
-        }
+        _azureDbContext = azureDbContext;
     }
 
     public async Task StartConsumingAsync(CancellationToken cancellationToken)
     {
         var config = new ConsumerConfig
         {
-            BootstrapServers = _kafkaConfig.Consumer.BootstrapServers,
+            BootstrapServers = _kafkaConfig.BootstrapServers,
             GroupId = _kafkaConfig.Consumer.GroupId,
             AutoOffsetReset = Enum.Parse<AutoOffsetReset>(_kafkaConfig.Consumer.AutoOffsetReset),
             EnableAutoCommit = _kafkaConfig.Consumer.EnableAutoCommit,
             SessionTimeoutMs = _kafkaConfig.Consumer.SessionTimeoutMs,
             MaxPollIntervalMs = _kafkaConfig.Consumer.MaxPollIntervalMs,
-            EnablePartitionEof = _kafkaConfig.Consumer.EnablePartitionEof,
-            AllowAutoCreateTopics = _kafkaConfig.Consumer.AllowAutoCreateTopics,
-            IsolationLevel = Enum.Parse<IsolationLevel>(_kafkaConfig.Consumer.IsolationLevel)
+            EnablePartitionEof = _kafkaConfig.Consumer.EnablePartitionEof
         };
 
         _consumer = new ConsumerBuilder<string, string>(config)
@@ -79,11 +66,11 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
             .SetLogHandler((_, message) => _logger.LogDebug("Consumer log: {Message}", message.Message))
             .Build();
 
-        _consumer.Subscribe(_kafkaConfig.TopicName);
+        _consumer.Subscribe(_kafkaConfig.Topics.DataTopic);
         _isConsuming = true;
 
         _logger.LogInformation("Azure Consumer started with idempotency. Group: {GroupId}, Topic: {Topic}", 
-            _consumerGroupId, _kafkaConfig.TopicName);
+            _consumerGroupId, _kafkaConfig.Topics.DataTopic);
 
         await ConsumeLoop(cancellationToken);
     }
@@ -168,7 +155,8 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
                 await _retryService.ExecuteWithRetryAsync(
                     operation: () => SaveToAzureEndpoint(dataMessage),
                     operationName: "SaveToAzureEndpoint",
-                    correlationId: messageProcessingId
+                    correlationId: messageProcessingId,
+                    errorType: ErrorType.Transient
                 );
 
                 processingResult = true;
@@ -235,41 +223,36 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
     private async Task SaveToAzureEndpoint(DataSyncMessage message)
     {
         // Simulate different types of failures for testing
-        await SimulateProcessingConditions();
+        // await SimulateProcessingConditions(); // DISABLED: Simulated errors
 
-        var jsonPayload = JsonSerializer.Serialize(new
+        // Create a new data entity for the Azure database
+        var dataEntity = new DataEntity
         {
-            Id = message.Id,
+            // Generate a new integer ID instead of parsing the UUID string
+            Id = 0, // Let the database auto-generate the ID
             Data = message.Data,
-            Timestamp = message.Timestamp,
-            Source = "Azure-Consumer",
-            ProcessedAt = DateTime.UtcNow
-        });
+            CreatedAt = DateTime.UtcNow
+        };
 
-        var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
-        
         try
         {
-            var response = await _httpClient.PostAsync("/api/sync/azure", content);
+            // Add the entity to the context
+            _azureDbContext.DataEntities.Add(dataEntity);
             
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                throw new HttpRequestException($"Azure endpoint returned {response.StatusCode}: {errorContent}");
-            }
-
-            var responseContent = await response.Content.ReadAsStringAsync();
-            _logger.LogDebug("Azure endpoint response: {Response}", responseContent);
+            // Save changes to the database
+            await _azureDbContext.SaveChangesAsync();
+            
+            _logger.LogDebug("Successfully saved data to Azure database for message {MessageId}", message.Id);
         }
-        catch (HttpRequestException ex)
+        catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "HTTP error calling Azure endpoint for message {MessageId}", message.Id);
+            _logger.LogError(ex, "Database error saving to Azure database for message {MessageId}", message.Id);
             throw;
         }
-        catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException)
+        catch (Exception ex)
         {
-            _logger.LogError(ex, "Timeout calling Azure endpoint for message {MessageId}", message.Id);
-            throw new TimeoutException($"Azure endpoint timeout for message {message.Id}", ex);
+            _logger.LogError(ex, "Unexpected error saving to Azure database for message {MessageId}", message.Id);
+            throw;
         }
     }
 
@@ -318,12 +301,25 @@ public class AzureKafkaConsumerService : IAzureKafkaConsumerService, IDisposable
         }
     }
 
+    public async Task<bool> ProcessMessageAsync(DataSyncMessage message)
+    {
+        try
+        {
+            await SaveToAzureEndpoint(message);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to process message {MessageId}", message.Id);
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         try
         {
             _consumer?.Dispose();
-            _httpClient?.Dispose();
         }
         catch (Exception ex)
         {

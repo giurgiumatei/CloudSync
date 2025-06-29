@@ -29,7 +29,6 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
             BatchSize = _kafkaConfig.Producer.BatchSize,
             LingerMs = _kafkaConfig.Producer.LingerMs,
             MaxInFlight = _kafkaConfig.Producer.MaxInFlight,
-            DeliveryTimeoutMs = _kafkaConfig.Producer.DeliveryTimeoutMs,
             RequestTimeoutMs = _kafkaConfig.Producer.RequestTimeoutMs,
             RetryBackoffMs = _kafkaConfig.Producer.RetryBackoffMs,
             
@@ -169,8 +168,8 @@ public class KafkaProducerService : IKafkaProducerService, IDisposable
 
             var deliveryResult = await _producer.ProduceAsync(_kafkaConfig.Topics.DeadLetterQueue, kafkaMessage);
             
-            var errorType = processingError?.Type?.ToString() ?? "Unknown";
-            var severity = processingError?.Severity?.ToString() ?? "Unknown";
+            var errorType = processingError != null ? processingError.Type.ToString() : "Unknown";
+            var severity = processingError != null ? processingError.Severity.ToString() : "Unknown";
             
             _logger.LogWarning("Message {MessageId} sent to DLQ - Error: {Error}, Type: {ErrorType}, Severity: {Severity}, Retries: {RetryCount}", 
                 message.Id, error, errorType, severity, message.RetryCount);

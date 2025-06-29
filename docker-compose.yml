@@ -6,22 +6,23 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports:
-      - "5000:80"
+      - "5001:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__AzureConnection=Server=azure-db;Database=AzureDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
-      - ConnectionStrings__AwsConnection=Server=aws-db;Database=AwsDb;User Id=sa;Password=P@ssw0rd;TrustServerCertificate=True;
+      - ConnectionStrings__AzureConnection=Host=azure-db;Database=AzureDb;Username=sa;Password=P@ssw0rd;
+      - ConnectionStrings__AwsConnection=Host=aws-db;Database=AwsDb;Username=sa;Password=P@ssw0rd;
+      - Kafka__BootstrapServers=kafka:29092
       - ASPNETCORE_URLS=http://+:80
       # Performance optimizations
       - DOTNET_GCServer=1
       - DOTNET_GCConcurrent=1
       - DOTNET_GCRetainVM=1
     depends_on:
-      azure-db:
+      db-init:
+        condition: service_completed_successfully
+      aws-consumer:
         condition: service_healthy
-      aws-db:
-        condition: service_healthy
-      kafka:
+      azure-consumer:
         condition: service_healthy
     restart: unless-stopped
     # Resource limits for consistent performance testing
@@ -78,14 +79,15 @@ services:
       net.ipv4.ip_local_port_range: "1024 65535"
       net.ipv4.tcp_tw_reuse: 1
 
+  # Azure Database (ARM64 compatible - PostgreSQL)
   azure-db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:15-alpine
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=P@ssw0rd
-      - MSSQL_PID=Developer
+      POSTGRES_DB: AzureDb
+      POSTGRES_USER: sa
+      POSTGRES_PASSWORD: YourStrong@Passw0rd
     ports:
-      - "1433:1433"
+      - "5434:5432"
     restart: unless-stopped
     # Database performance optimizations
     deploy:
@@ -97,23 +99,24 @@ services:
           cpus: '1.0'
           memory: 1G
     volumes:
-      - azure-db-data:/var/opt/mssql
-      - ./Scripts/init-azure-db.sql:/docker-entrypoint-initdb.d/init-azure-db.sql:ro
+      - azure_postgres_data:/var/lib/postgresql/data
+      - ./Scripts/init-azure-db.sql:/docker-entrypoint-initdb.d/init-azure-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "pg_isready -U sa -d AzureDb"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
+  # AWS Database (ARM64 compatible - PostgreSQL)
   aws-db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:15-alpine
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=P@ssw0rd
-      - MSSQL_PID=Developer
+      POSTGRES_DB: AwsDb
+      POSTGRES_USER: sa
+      POSTGRES_PASSWORD: YourStrong@Passw0rd
     ports:
-      - "1434:1433"
+      - "5433:5432"
     restart: unless-stopped
     # Database performance optimizations
     deploy:
@@ -125,36 +128,33 @@ services:
           cpus: '1.0'
           memory: 1G
     volumes:
-      - aws-db-data:/var/opt/mssql
-      - ./Scripts/init-aws-db.sql:/docker-entrypoint-initdb.d/init-aws-db.sql:ro
+      - aws_postgres_data:/var/lib/postgresql/data
+      - ./Scripts/init-aws-db.sql:/docker-entrypoint-initdb.d/init-aws-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P P@ssw0rd -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "pg_isready -U sa -d AwsDb"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
-  # Database initializer service
+  # Database initializer service (PostgreSQL)
   db-init:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:15-alpine
     depends_on:
-      azure-db:
-        condition: service_healthy
-      aws-db:
-        condition: service_healthy
+      - azure-db
+      - aws-db
     volumes:
       - ./Scripts:/scripts:ro
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=P@ssw0rd
+      - POSTGRES_PASSWORD=YourStrong@Passw0rd
     command: >
       bash -c "
         echo 'Waiting for databases to be ready...' &&
         sleep 10 &&
         echo 'Initializing Azure database...' &&
-        /opt/mssql-tools/bin/sqlcmd -S azure-db -U sa -P P@ssw0rd -i /scripts/init-azure-db.sql &&
+        PGPASSWORD=YourStrong@Passw0rd psql -h azure-db -U sa -d AzureDb -f /scripts/init-azure-db.sql &&
         echo 'Initializing AWS database...' &&
-        /opt/mssql-tools/bin/sqlcmd -S aws-db -U sa -P P@ssw0rd -i /scripts/init-aws-db.sql &&
+        PGPASSWORD=YourStrong@Passw0rd psql -h aws-db -U sa -d AwsDb -f /scripts/init-aws-db.sql &&
         echo 'Database initialization completed successfully!'
       "
     restart: "no"
@@ -175,6 +175,12 @@ services:
         limits:
           cpus: '1.0'
           memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
@@ -232,14 +238,19 @@ services:
   kafka-init:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
-      kafka:
-        condition: service_healthy
+      - kafka
+      - db-init
     command: >
       bash -c "
+        echo 'Waiting for Kafka to be ready...' &&
+        sleep 10 &&
         echo 'Creating Kafka topics...' &&
         kafka-topics --create --topic data-topic --bootstrap-server kafka:29092 --partitions 12 --replication-factor 1 --config min.insync.replicas=1 --config retention.ms=604800000 --config segment.ms=86400000 --config compression.type=lz4 &&
         kafka-topics --create --topic data-topic-dlq --bootstrap-server kafka:29092 --partitions 4 --replication-factor 1 --config min.insync.replicas=1 --config retention.ms=2419200000 &&
-        echo 'Kafka topics created successfully!'
+        echo 'Kafka topics created successfully!' &&
+        echo 'Verifying topics exist...' &&
+        kafka-topics --list --bootstrap-server kafka:29092 &&
+        echo 'Kafka initialization completed!'
       "
     restart: "no"
 
@@ -247,69 +258,45 @@ services:
   aws-consumer:
     build:
       context: .
-      dockerfile: Dockerfile.aws-consumer
-    environment:
-      - DOTNET_ENVIRONMENT=Development
-      - Kafka__BootstrapServers=kafka:29092
-      - Kafka__Consumer__GroupId=aws-sync-group
-      - Kafka__Consumer__ClientId=cloudsync-aws-consumer
-      - AwsEndpoint__BaseUrl=https://api.aws-example.com
-      - DOTNET_GCServer=1
-      - DOTNET_GCConcurrent=1
+      dockerfile: CloudSync.KafkaAwsConsumer/Dockerfile
     depends_on:
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
+      - db-init
+      - kafka-init
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AwsConnection=Host=aws-db;Database=AwsDb;Username=sa;Password=YourStrong@Passw0rd;
+      - Kafka__BootstrapServers=kafka:29092
+      - ASPNETCORE_URLS=http://+:80
+    ports:
+      - "8082:80"
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'CloudSync.KafkaAwsConsumer' || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthcheck"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # Azure Kafka Consumer Service
   azure-consumer:
     build:
       context: .
       dockerfile: Dockerfile.azure-consumer
-    environment:
-      - DOTNET_ENVIRONMENT=Development
-      - Kafka__BootstrapServers=kafka:29092
-      - Kafka__Consumer__GroupId=azure-sync-group
-      - Kafka__Consumer__ClientId=cloudsync-azure-consumer
-      - AzureEndpoint__BaseUrl=https://api.azure-example.com
-      - DOTNET_GCServer=1
-      - DOTNET_GCConcurrent=1
     depends_on:
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
-          cpus: '1.0'
-          memory: 1G
+      - db-init
+      - kafka-init
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AzureConnection=Host=azure-db;Database=AzureDb;Username=sa;Password=YourStrong@Passw0rd;
+      - Kafka__BootstrapServers=kafka:29092
+      - ASPNETCORE_URLS=http://+:80
+    ports:
+      - "8083:80"
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'CloudSync.KafkaAzureConsumer' || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthcheck"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
 
   # Optional monitoring service for performance insights
   monitoring:
@@ -331,8 +318,8 @@ services:
       - monitoring
 
 volumes:
-  azure-db-data:
-  aws-db-data:
+  azure_postgres_data:
+  aws_postgres_data:
   prometheus-data:
   kafka-data:
 
